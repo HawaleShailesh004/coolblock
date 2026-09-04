@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@import "@coolblock/ui/tokens.css";
+
+@theme inline {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-bg-2: var(--bg-2);
+  --color-paper-0: var(--paper-0);
+  --color-paper-1: var(--paper-1);
+  --color-ink-0: var(--ink-0);
+
+  --color-t-00: var(--t-00);
+  --color-t-20: var(--t-20);
+  --color-t-40: var(--t-40);
+  --color-t-60: var(--t-60);
+  --color-t-80: var(--t-80);
+  --color-t-100: var(--t-100);
+
+  --color-cool: var(--cool);
+  --color-equity: var(--equity);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+
+  --font-display: var(--font-display);
+  --font-ui: var(--font-ui);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--paper-0);
+  color: var(--ink-0);
+  font-family: var(--font-ui);
+}

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NextStep Hacks 2026 — Strategy Brief</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #16232b;
+      --ink-soft: #3d5260;
+      --paper: #eef4f6;
+      --card: #f8fbfc;
+      --line: #c5d4db;
+      --teal: #0f5c62;
+      --teal-deep: #0a3d42;
+      --water: #2a7f89;
+      --moss: #2d6a4f;
+      --gold: #b8860b;
+      --amber: #9a4d0a;
+      --clay: #8b3a2a;
+      --sky: #d6ebef;
+      --rank-1: #0f5c62;
+      --rank-2: #9a4d0a;
+      --rank-3: #2d6a4f;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    a { color: var(--teal); }
+    a:hover { color: var(--teal-deep); }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      background: var(--teal-deep);
+      color: #e6f3f4;
+      padding: 1.6rem 1.1rem;
+    }
+
+    nav .brand {
+      font-family: "Libre Baskerville", Georgia, serif;
+      font-size: 1.05rem;
+      line-height: 1.35;
+      margin: 0 0 1.4rem;
+    }
+
+    nav a {
+      display: block;
+      color: #c5e0e3;
+      text-decoration: none;
+      padding: 0.45rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+
+    nav a:hover,
+    nav a:focus-visible {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      outline: none;
+    }
+
+    main { padding: 2.2rem 2.4rem 4rem; max-width: 980px; }
+
+    h1, h2, h3 {
+      font-family: "Libre Baskerville", Georgia, serif;
+      line-height: 1.25;
+      color: var(--teal-deep);
+    }
+
+    h1 { font-size: 2.15rem; margin: 0 0 0.6rem; }
+    h2 {
+      font-size: 1.45rem;
+      margin: 2.4rem 0 0.9rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 3px solid var(--water);
+    }
+    h3 { font-size: 1.12rem; margin: 1.6rem 0 0.55rem; color: var(--teal); }
+
+    p { max-width: 68ch; }
+    li { max-width: 72ch; }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.7rem;
+      margin: 1.2rem 0 1.6rem;
+    }
+
+    .meta div {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--water);
+      padding: 0.7rem 0.8rem;
+    }
+
+    .meta dt {
+      font-size: 0.75rem;
+      color: var(--ink-soft);
+      margin: 0 0 0.15rem;
+    }
+
+    .meta dd { margin: 0; font-weight: 600; }
+
+    .callout {
+      background: var(--sky);
+      border: 1px solid #b4d4da;
+      border-left: 5px solid var(--water);
+      padding: 0.9rem 1rem;
+      margin: 1rem 0;
+      max-width: 72ch;
+    }
+
+    .callout.warn {
+      background: #f8efe4;
+      border-color: #e4c9a6;
+      border-left-color: var(--amber);
+    }
+
+    .callout.danger {
+      background: #f6e8e4;
+      border-color: #e0b8af;
+      border-left-color: var(--clay);
+    }
+
+    .callout.win {
+      background: #e6f3ee;
+      border-color: #b5d4c4;
+      border-left-color: var(--moss);
+    }
+
+    .callout.bet {
+      background: var(--teal-deep);
+      color: #eef7f8;
+      border: none;
+      border-left: 6px solid var(--gold);
+      max-width: none;
+    }
+
+    .callout.bet a { color: #9ee0e6; }
+    .callout.bet h3 { color: #f4d27a; margin-top: 0; }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.9rem 1rem;
+      background: #f3e9dc;
+      border-left: 5px solid var(--amber);
+      font-style: italic;
+      max-width: 72ch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      background: var(--card);
+      margin: 0.8rem 0 1.2rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.5rem 0.55rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--teal);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    tbody tr:nth-child(even) { background: #e8f2f4; }
+
+    .score {
+      display: inline-block;
+      min-width: 1.6rem;
+      text-align: center;
+      font-weight: 700;
+      border-radius: 3px;
+      padding: 0 0.25rem;
+    }
+
+    .s5 { background: #c8eadc; color: #14532d; }
+    .s4 { background: #dcecc8; color: #3f6212; }
+    .s3 { background: #f3e4b8; color: #713f12; }
+    .s2 { background: #f5d5c8; color: #7c2d12; }
+
+    .total {
+      background: var(--teal-deep);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .top3 { background: #d7efe8; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0 1rem; }
+
+    .chip {
+      background: var(--teal);
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.18rem 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .chip.gold { background: var(--gold); color: #1a1404; }
+    .chip.moss { background: var(--moss); }
+    .chip.clay { background: var(--clay); }
+
+    .judge {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 0.85rem 1rem;
+      margin: 0.7rem 0;
+    }
+
+    .judge h4 { margin: 0 0 0.35rem; color: var(--teal-deep); }
+
+    .fit { color: var(--moss); font-weight: 700; }
+
+    .problem-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      color: #fff;
+    }
+
+    .b1 { background: var(--rank-1); }
+    .b2 { background: var(--rank-2); }
+    .b3 { background: var(--rank-3); }
+
+    footer {
+      margin-top: 3rem;
+      color: var(--ink-soft);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 820px) {
+      .wrap { grid-template-columns: 1fr; }
+      nav { position: static; height: auto; }
+      nav a { display: inline-block; }
+      main { padding: 1.2rem 1rem 3rem; }
+      table { display: block; overflow-x: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav aria-label="Brief sections">
+      <p class="brand">NextStep Hacks 2026<br />Strategy Brief</p>
+      <a href="#meta">Overview</a>
+      <a href="#p1">Phase 1 — Intelligence</a>
+      <a href="#p2">Phase 2 — Solution space</a>
+      <a href="#p3">Phase 3 — Problem pool</a>
+      <a href="#p4">Phase 4 — Deep dives</a>
+      <a href="#wellsafe">WellSafe</a>
+      <a href="#heatmap">HeatMap</a>
+      <a href="#freshlens">FreshLens</a>
+      <a href="#p5">Phase 5 — Bet</a>
+    </nav>
+
+    <main>
+      <h1>NextStep Hacks 2026</h1>
+      <p>Hackathon strategy brief for <strong>Earth Forward</strong>. Goal: maximize the chance of winning this event — not look creative.</p>
+
+      <div class="chips">
+        <span class="chip">Earth Forward</span>
+        <span class="chip gold">Deadline Sep 13, 2026 · 5:00 PM EDT</span>
+        <span class="chip moss">502 participants</span>
+        <span class="chip clay">Bet: WellSafe</span>
+      </div>
+
+      <section id="meta" class="meta">
+        <div><dt>Theme</dt><dd>Earth Forward</dd></div>
+        <div><dt>Deadline</dt><dd>Sep 13, 2026, 5:00 PM EDT</dd></div>
+        <div><dt>Participants</dt><dd>502 (as of Sep 3)</dd></div>
+        <div><dt>Format</dt><dd>Online, ~3 weeks (Aug 21 – Sep 13)</dd></div>
+        <div><dt>Organizer</dt><dd>HackAlphaX (student-led nonprofit)</dd></div>
+      </section>
+
+      <h2 id="p1">Phase 1 — Hackathon intelligence brief</h2>
+
+      <h3>1a. Theme decoding</h3>
+      <p>“Earth Forward” is an environmental-tech theme. The description lists climate resilience, renewable energy, conservation, sustainable agriculture, and waste reduction. The key phrase is <strong>identify a pressing environmental problem affecting your community or the world</strong>. That is intentionally broad — any environmental angle qualifies. The encouragement to collaborate with local organizations, environmental groups, researchers, or community members signals judges reward <strong>grounded, community-connected solutions</strong> over abstract global platforms.</p>
+      <div class="callout">
+        <strong>What the theme implicitly favors:</strong> tangible, demonstrable environmental impact on a specific community or user group. Not policy papers, not awareness campaigns — working tools that address a specific pain point.
+      </div>
+      <p><strong>Disqualifiers / constraints:</strong> Students only, ages 13+. Companies and professional orgs excluded. Old projects allowed only if you clearly delineate pre-hackathon vs. during-hackathon work.</p>
+
+      <h3>1b. Participant density read</h3>
+      <p>502 participants is moderate for a Devpost hackathon. In past years: 2025 had 885, 2024 had a similar scale. Actual submissions will be far fewer — typically 15–25% of registrants submit. Expect <strong>~75–125 submissions</strong>.</p>
+      <p>At this count, a polished, technically impressive project with a clear problem statement stands out. The average team is high-school students, many first-time hackers (the event is tagged Beginner Friendly). The quality floor is low — many submissions will be concept pitches, half-working prototypes, or generic “awareness” apps. <strong>A fully functional demo with real data wins on completion alone.</strong></p>
+
+      <h3>1c. Prize structure full parse</h3>
+      <table>
+        <thead>
+          <tr><th>Prize</th><th>Cash</th><th>Extras</th><th>Winners</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1st Place</td>
+            <td>$1,000</td>
+            <td>$500 Claude credits, Final Round Interview @ YC startup, 2 AOPS coupons, XYZ domains, 1yr NordVPN / NordPass / Saily / Incogni</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>2nd Place</td>
+            <td>$500</td>
+            <td>$250 Claude credits, 1 AOPS coupon, XYZ domains, 1yr Nord suite</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>3rd Place</td>
+            <td>$250</td>
+            <td>$100 Claude credits, 1 AOPS coupon, XYZ domains, 1yr Nord suite</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>Participation</td>
+            <td>—</td>
+            <td>Wolfram Alpha access ($830 value), XYZ domains</td>
+            <td>700</td>
+          </tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>There is only <strong>one track</strong> (“Earth Forward”) — no separate track prizes to optimize for. Win overall or don’t.</li>
+        <li><strong>No “Best Use of X” special prizes</strong> are listed for 2026. Claude is a sponsor but there is no “Best Use of Claude” prize. Use the best tools for the job; don’t force sponsor integrations.</li>
+        <li>Claude credits as prizes signal organizers value AI-powered projects. Using Claude / AI well is a soft signal to judges.</li>
+        <li>The YC startup interview for 1st place signals they value <strong>entrepreneurial framing</strong> — projects that could become real products.</li>
+      </ul>
+
+      <h3>1d. Submission requirements as design constraints</h3>
+      <ol>
+        <li><strong>Video demo / pitch ≤ 5 minutes</strong> → Must be demo-able on video. No backend-only tools. Must have a visual interface or clear visual output. The 5-min cap rewards focused narratives.</li>
+        <li><strong>Link to repository / code</strong> → Code must be clean enough to inspect. Messy repos signal low completion.</li>
+        <li><strong>Link to live website / app (if applicable)</strong> → Live deployment is a differentiator. Browser-working solutions beat “run locally.”</li>
+      </ol>
+      <div class="callout">
+        <strong>Constraint list (all solutions must satisfy)</strong>
+        <ul>
+          <li>C1: Visual, demo-able interface (web or mobile)</li>
+          <li>C2: Deployable / accessible live (strong advantage)</li>
+          <li>C3: Clear 3-minute story (problem → solution → demo) plus 2 minutes for context / impact</li>
+          <li>C4: Clean, inspectable code repository</li>
+          <li>C5: Address the Earth Forward environmental theme directly</li>
+          <li>C6: Clearly delineate what was built during the hackathon period</li>
+        </ul>
+      </div>
+
+      <h3>1e. Technology deep read</h3>
+      <p>No required technologies or sponsor SDKs are mandated.</p>
+      <ul>
+        <li><strong>Claude</strong> — AI / LLM. Mature API. Strong for text analysis, generation, agents. Deep integration means more than a chatbot wrapper.</li>
+        <li><strong>Wolfram</strong> — Computation engine. Good for scientific / mathematical modeling. Participation prize only.</li>
+        <li><strong>NordVPN / NordPass / Saily / Incogni</strong> — Consumer privacy products. No technical integration expected.</li>
+        <li><strong>XYZ Domains</strong> — Domain registration. No integration.</li>
+        <li><strong>Kinetik</strong> — Listed as sponsor but no specific prize.</li>
+        <li><strong>AOPS</strong> — Math education. No integration.</li>
+      </ul>
+      <p><strong>Strategic tech read:</strong> Claude is the only sponsor with a technical product relevant to building. Using Claude’s API deeply (multi-step reasoning, tool use, structured outputs) signals platform expertise.</p>
+      <p><strong>Risk assessment:</strong> Major web frameworks, APIs, and deployment platforms are stable. The real risk is demo instability from poor deployment or flaky third-party APIs.</p>
+
+      <h3>1f. Judge intelligence</h3>
+      <p>The 2026 judges are listed only as <strong>HackAlphaX Team</strong> — no individual names. Known leadership from past years and LinkedIn:</p>
+
+      <article class="judge">
+        <h4>Aditya Kirubakaran — Founder &amp; Executive Director</h4>
+        <p>Student. Led all past NextStep Hacks as lead organizer and judge. No published technical work found. Focused on STEM accessibility.</p>
+        <p><em>Evidence:</em> Named as judge in 2021, 2024; credited as founder on Devpost and hackalphax.co.</p>
+        <p><em>Bias:</em> Values accessibility, social impact, beginner-friendliness. Will respond to projects usable by non-technical people.</p>
+      </article>
+      <article class="judge">
+        <h4>Krishnan Shankar — Technical &amp; Operations Lead</h4>
+        <p>Listed on LinkedIn as Technical Lead at HackAlphaX. Talent sources include FIRST Tech Challenge and HackTJ — robotics / hackathon background.</p>
+        <p><em>Evidence:</em> Named as judge in 2021. LinkedIn profile found.</p>
+        <p><em>Bias:</em> Technical background. Will evaluate whether the tech works and is well-architected.</p>
+      </article>
+      <article class="judge">
+        <h4>Samanyu Bansal — Growth / Outreach Lead</h4>
+        <p>High school student (John P. Stevens HS, Edison NJ). Skills listed as coding, math.</p>
+        <p><em>Evidence:</em> LinkedIn profile, named as judge in 2021.</p>
+        <p><em>Bias:</em> Younger judge; likely values creative presentation and clear communication.</p>
+      </article>
+      <article class="judge">
+        <h4>Keshav Majithia — Financials Lead</h4>
+        <p>Named in 2021 judging panel. No further public profile found. Cannot assess bias beyond title.</p>
+      </article>
+
+      <p><strong>Past external judges (2021):</strong> Vladislav Gukasov (Senior SWE), Albert Lie (ex-founding engineer Xendit / YC S15), Alexander Kozhenkov (Team Lead GridGain), plus several Russian-market developers. Unclear if external judges return for 2026 — the listing says only “HackAlphaX Team.”</p>
+
+      <div class="callout">
+        <strong>Panel synthesis.</strong> The panel is student-led and non-specialist — not domain experts in environmental science or ML. Past winners:
+        <ul>
+          <li><strong>2025:</strong> DyslexicAssist, Memora, Eyelink — human-centered, specific-user-group tools with AI and polished UX.</li>
+          <li><strong>2024:</strong> BizVision, LocalHarvest, OrderMatic, MyMarket — practical tools for specific communities.</li>
+          <li><strong>2022:</strong> MusicGenic, Photo Cook, MedChain — consumer-facing, clear value prop, demo-friendly.</li>
+        </ul>
+        <p>Pattern: <strong>specific problem, specific user, polished demo, clear AI / tech integration.</strong> Not research projects, dashboards, or awareness sites. Judges reward “I can see this being a real product.”</p>
+      </div>
+
+      <h2 id="p2">Phase 2 — Solution space mapping</h2>
+
+      <h3>2a. Track selection</h3>
+      <p>There is only one track: <strong>Earth Forward (environmental)</strong>. No track selection needed.</p>
+
+      <h3>2b. Default solution (40–60% of teams)</h3>
+      <blockquote>
+        “An eco-awareness web app that calculates your personal carbon footprint from a questionnaire, displays it on a dashboard with charts, and suggests generic tips to reduce it. May include a chatbot powered by an LLM that answers sustainability questions. Basic React / Next.js frontend, a few API calls, deployed on Vercel.”
+      </blockquote>
+      <p>Variants: recycling classifier (upload image → “plastic” or “glass”), tree-planting tracker, sustainability-tips chatbot, environmental news aggregator.</p>
+      <div class="callout danger"><strong>This is the crowded center. Do not build this.</strong></div>
+
+      <h3>2c. Existing solution landscape</h3>
+      <ul>
+        <li><strong>Carbon calculators:</strong> EPA, CoolClimate, Wren, Joro, Klima — saturated.</li>
+        <li><strong>Recycling classifiers:</strong> TrashBot and countless hackathon projects. Overdone.</li>
+        <li><strong>Air quality:</strong> PurpleAir, AirNow, IQAir — extensive networks already exist.</li>
+        <li><strong>Water quality:</strong> Limited consumer tools. EPA databases cover public systems, not private wells. <strong>Genuine gap.</strong></li>
+        <li><strong>Food waste:</strong> Too Good To Go, Flashfood, Winnow, Leanpath. Household tools are weak.</li>
+        <li><strong>Biodiversity:</strong> iNaturalist, eBird, Seek — dominant, with documented bias and offline limits.</li>
+        <li><strong>Urban heat:</strong> Academic tools exist; no consumer-facing community tools. <strong>Gap.</strong></li>
+      </ul>
+
+      <h2 id="p3">Phase 3 — Problem identification</h2>
+      <p>Scored 1–5 on: A Pain · B Gap · C Hack fit · D Judge · E Feasibility · F Special prize. Top 3 by arithmetic only.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Problem</th><th>Who</th><th>Why current solutions fail</th>
+            <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="top3">
+            <td>1</td>
+            <td><strong>Private well water contamination blindness</strong></td>
+            <td>23M US households on private wells</td>
+            <td>EPA doesn’t regulate private wells; testing $100–300+; 40% of Iowa well owners never test; PFAS in 20–95% of tested wells.</td>
+            <td><span class="score s5">5</span></td><td><span class="score s5">5</span></td><td><span class="score s5">5</span></td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s2">2</span></td>
+            <td class="total">25</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Hyperlocal wildfire smoke exposure gaps</td>
+            <td>Wildfire-prone communities far from monitors</td>
+            <td>Regulatory monitors miss neighborhood scale; communities have sensors but can’t interpret them.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s3">3</span></td><td><span class="score s5">5</span></td>
+            <td><span class="score s4">4</span></td><td><span class="score s3">3</span></td><td><span class="score s2">2</span></td>
+            <td class="total">21</td>
+          </tr>
+          <tr class="top3">
+            <td>3</td>
+            <td><strong>Urban heat island inequity mapping</strong></td>
+            <td>Low-income urban residents in heat-vulnerable neighborhoods</td>
+            <td>Satellite data exists; &lt;11% of 500+ papers engaged communities. No consumer tool turns heat data into action.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s5">5</span></td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s2">2</span></td>
+            <td class="total">23</td>
+          </tr>
+          <tr class="top3">
+            <td>4</td>
+            <td><strong>Household food waste from expiry confusion</strong></td>
+            <td>Consumers who throw away safe food due to date labels</td>
+            <td>Manual entry; unreliable receipt scan; incomplete shelf-life data; no link from fridge contents to spoilage science.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s3">3</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s4">4</span></td><td><span class="score s5">5</span></td><td><span class="score s2">2</span></td>
+            <td class="total">22</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Citizen science biodiversity data is biased and unusable</td>
+            <td>Conservation researchers and land managers</td>
+            <td>iNaturalist biased to parks / charismatic species; quality filters destroy sample size.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s3">3</span></td><td><span class="score s4">4</span></td><td><span class="score s2">2</span></td>
+            <td class="total">21</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>Small-farm environmental monitoring is unaffordable</td>
+            <td>Smallholder farmers needing soil / weather data</td>
+            <td>Commercial IoT costs thousands, needs internet, breaks without local repair.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s3">3</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s2">2</span></td>
+            <td class="total">19</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>Community water infrastructure decay is invisible</td>
+            <td>Small-town residents on aging municipal systems</td>
+            <td>Lead lines and aging pipes; risk data sits in utility records, not with residents.</td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s2">2</span></td>
+            <td class="total">18</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>Greenwashing in consumer products is hard to verify</td>
+            <td>Eco-conscious shoppers</td>
+            <td>“Eco-friendly” labels unregulated; FTC Green Guides not consumer-accessible.</td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s4">4</span></td><td><span class="score s5">5</span></td><td><span class="score s2">2</span></td>
+            <td class="total">21</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>Climate adaptation planning for small municipalities</td>
+            <td>Small-town planners</td>
+            <td>Large cities have plans; towns under 50k rarely do. Existing tools need GIS expertise.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s5">5</span></td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s2">2</span></td>
+            <td class="total">21</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>Microplastic exposure from household water / food is unmeasured</td>
+            <td>Health-conscious households</td>
+            <td>No consumer exposure estimate; research split across water, food, air.</td>
+            <td><span class="score s4">4</span></td><td><span class="score s4">4</span></td><td><span class="score s4">4</span></td>
+            <td><span class="score s3">3</span></td><td><span class="score s3">3</span></td><td><span class="score s2">2</span></td>
+            <td class="total">20</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout win">
+        <strong>Top 3 by arithmetic</strong>
+        <ol>
+          <li>#1 — Private well water contamination blindness (25)</li>
+          <li>#3 — Urban heat island inequity mapping (23)</li>
+          <li>#4 — Household food waste from expiry confusion (22)</li>
+        </ol>
+      </div>
+
+      <h2 id="p4">Phase 4 — Top 3 problem deep dives</h2>
+
+      <article id="wellsafe">
+        <div class="problem-head">
+          <span class="badge b1">#1 · Score 25</span>
+          <h3>WellSafe — Private well water risk intelligence</h3>
+        </div>
+
+        <h3>The problem</h3>
+        <p>23 million US households rely on private wells. The EPA has no authority to regulate or monitor them. Testing costs $100–300+ per panel, requires mailing samples, and returns jargon most homeowners can’t interpret. 40% of Iowa well owners never test. PFAS — linked to cancer, thyroid disease, and immune suppression — has been found in 20–95% of tested private wells depending on region. Low-income and minority communities test least.</p>
+
+        <h3>Evidence of real pain</h3>
+        <ol>
+          <li><strong>PFAS in Rural US Well Water (2025, ES&amp;T):</strong> “The vast majority of private well users lack information to guide decision-making… public health departments are typically understaffed.” <a href="https://doi.org/10.1021/acs.est.5c02521">doi:10.1021/acs.est.5c02521</a></li>
+          <li><strong>“Bad water just means bad health” — NC barriers study (2025):</strong> Financial barriers, agricultural hazards, discrimination, knowledge gaps, mistrust. <a href="https://beta.iopscience.iop.org/article/10.1088/2752-5309/ae4f17">doi:10.1088/2752-5309/ae4f17</a></li>
+          <li><strong>Iowa Private Well Testing RCT (2024, ES&amp;T):</strong> “Around 40% of households do not regularly test, treat, or avoid their drinking water.” <a href="https://pubs.acs.org/doi/full/10.1021/acs.est.4c02835">doi:10.1021/acs.est.4c02835</a></li>
+          <li><strong>Private Well Water Safety (2025, JABFM):</strong> Low-income and less-educated households test and treat less, even when free testing exists. <a href="https://www.jabfm.org/content/jabfp/38/6/1126.full.pdf">JABFM 38/6</a></li>
+          <li><strong>Tapwater contaminant mixtures (2025, RSC):</strong> High analytical costs and conflation of safety with taste undermine monitoring. <a href="https://pubs.rsc.org/en/content/articlehtml/2025/ew/d5ew00490j">doi:10.1039/D5EW00490J</a></li>
+        </ol>
+
+        <h3>Existing solutions and why they fail</h3>
+        <ul>
+          <li><strong>EPA PFAS Analytic Tools:</strong> National source database, not a user tool. Doesn’t estimate private-well contamination likelihood.</li>
+          <li><strong>State well-testing programs:</strong> Understaffed, limited contaminants, affluent participation bias.</li>
+          <li><strong>MyWell / private well apps:</strong> Record-keeping, not risk prediction.</li>
+          <li><strong>Home test kits (Tap Score):</strong> Still $100–200+, mail-in, technical results. Don’t predict risk before you test.</li>
+        </ul>
+        <div class="callout warn"><strong>The gap:</strong> No tool tells a well owner, from location, well depth, land use, and known sources, what to test first — before they spend money.</div>
+
+        <h3>Proposed solution direction</h3>
+        <p><strong>WellSafe</strong> — AI-powered well water risk assessment. Enter an address and answer 5–6 questions (depth, age, nearby land use). Cross-references EPA PFAS / Superfund data, USGS groundwater quality, agricultural land use, aquifer vulnerability maps, and known incidents. Claude writes a personalized plain-language risk report with a cheap first test.</p>
+        <p><strong>Winning 3-minute demo:</strong> map → address → risk layers → report → prioritized tests → upload a lab PDF and have Claude interpret it.</p>
+        <p><strong>Core insight:</strong> risk <em>predictor</em>, not test-result recorder. Uses public data that has never been assembled for consumers.</p>
+
+        <h3>Special prize stack</h3>
+        <p>No special-category prizes in 2026. Deep Claude use (synthesis, report, lab interpretation) may informally resonate because Claude is a sponsor.</p>
+
+        <h3>Submission fit</h3>
+        <ul>
+          <li>C1 <span class="fit">pass</span> — Map UI with risk layers and reports</li>
+          <li>C2 <span class="fit">pass</span> — Standard web app on Vercel / Railway</li>
+          <li>C3 <span class="fit">pass</span> — “23M households don’t know what’s in their water → enter address → risk → action”</li>
+          <li>C4 <span class="fit">pass</span> — Next.js + API routes + Claude SDK</li>
+          <li>C5 <span class="fit">pass</span> — Water and community health</li>
+          <li>C6 <span class="fit">pass</span> — Built from scratch during the hackathon</li>
+        </ul>
+
+        <h3>Judging criterion alignment</h3>
+        <ul>
+          <li><strong>Originality:</strong> High. Carbon calculators are everywhere; well-water risk predictors are not.</li>
+          <li><strong>Adherence to track:</strong> Full. Water safety + community engagement.</li>
+          <li><strong>Completion:</strong> Web app + public APIs + Claude. Achievable in 3 weeks.</li>
+          <li><strong>Learning:</strong> Multi-source fusion, geospatial viz, AI reports.</li>
+          <li><strong>Design:</strong> Layered risk maps are visually compelling.</li>
+          <li><strong>Technology:</strong> Impressive without being fragile.</li>
+        </ul>
+
+        <h3>Judge resonance</h3>
+        <ul>
+          <li><strong>Aditya:</strong> Accessibility and social impact; underserved users; “real product” feel.</li>
+          <li><strong>Krishnan:</strong> Multi-data-source architecture.</li>
+          <li><strong>Panel:</strong> “23 million households” lands. Past winners targeted underserved populations.</li>
+        </ul>
+
+        <div class="callout warn">
+          <strong>Honest risk flags.</strong> USGS / EPA / Superfund data may need bulk download — verify coverage in 48 hours. Geospatial accuracy may force county-level, not parcel-level. Include “not a substitute for professional testing.”
+        </div>
+        <div class="callout">
+          <strong>Integration risk.</strong> EPA, USGS, Claude, and geocoding APIs are low risk. Most likely demo failure: address with no coverage. Mitigation: pre-load 3–4 demo regions and a graceful insufficient-data state.
+        </div>
+        <p><strong>Competitive positioning:</strong> Requires environmental-data literacy most high-school teams lack. Default projects are carbon calculators. Moat is data-fusion logic plus domain knowledge.</p>
+      </article>
+
+      <article id="heatmap">
+        <div class="problem-head">
+          <span class="badge b2">#2 · Score 23</span>
+          <h3>HeatMap — Neighborhood heat vulnerability intelligence</h3>
+        </div>
+
+        <h3>The problem</h3>
+        <p>Urban heat islands kill more Americans annually than any other weather event. Low-income neighborhoods — less tree cover, more asphalt, older housing without AC — run 5–15°F hotter than affluent areas in the same city. Block-level satellite thermal data exists (ECOSTRESS, Landsat), but a review of 500+ papers found only 10.9% engaged the communities analyzed. Data exists; translation to action does not.</p>
+
+        <h3>Evidence of real pain</h3>
+        <ol>
+          <li><strong>“Valley of death” in urban heat research (2025):</strong> 10.9% of 500+ papers engaged communities. <a href="https://doi.org/10.1177/19394071251413391">doi:10.1177/19394071251413391</a></li>
+          <li><strong>UHI policy in 5 cities (2025, Royal Society):</strong> Science-to-practice translation remains limited; planners need simple tools. <a href="https://doi.org/10.1098/rsta.2024.0581">doi:10.1098/rsta.2024.0581</a></li>
+          <li><strong>Bridging the application gap (2026):</strong> Impasse is not a deficit of tools. <a href="https://doi.org/10.1177/2754124x261447620">doi:10.1177/2754124x261447620</a></li>
+          <li><strong>Climate services reframing:</strong> Providers struggle to serve users unlike themselves. <a href="https://www.sciencedirect.com/science/article/pii/S2405880721000157">ScienceDirect</a></li>
+        </ol>
+
+        <h3>Existing solutions and why they fail</h3>
+        <ul>
+          <li><strong>NASA ECOSTRESS Explorer:</strong> Raw imagery, GIS expertise, no guidance.</li>
+          <li><strong>Heat.gov (NIHHIS):</strong> Coarse, not neighborhood-specific.</li>
+          <li><strong>Academic heat-equity maps:</strong> In journals, not in residents’ hands.</li>
+        </ul>
+        <div class="callout warn"><strong>The gap:</strong> No consumer tool says “your block is X degrees hotter, here’s why, here are the interventions that would help most.”</div>
+
+        <h3>Proposed solution direction</h3>
+        <p><strong>HeatMap</strong> — enter an address, get a block heat-risk score from Landsat / ECOSTRESS, tree canopy, impervious surface, census vulnerability, and AC estimates. Claude writes a neighborhood heat profile with ranked interventions.</p>
+        <p><strong>Demo:</strong> address → animated heat map → “Your block is 8°F hotter… 15 street trees on Main St would cut peak temp ~3°F.”</p>
+        <p>All submission constraints satisfied. Heat maps demo extremely well.</p>
+
+        <h3>Judging / judges</h3>
+        <ul>
+          <li>Originality high for a student hackathon. Direct climate-resilience and environmental-justice fit.</li>
+          <li>Same student panel; environmental-justice angle is strong; visuals win non-specialists.</li>
+        </ul>
+
+        <div class="callout warn">
+          <strong>Risks.</strong> ECOSTRESS / Landsat needs rasterio / GDAL — hardest 20%. Pre-process a few demo cities. Surface temperature ≠ air temperature — say so. NASA Earthdata is medium risk. Most likely demo failure: tile timeout. Mitigation: pre-render static tiles.
+        </div>
+        <p><strong>Competitive positioning:</strong> Satellite processing is a real barrier at this participant level. A GIS-experienced team could copy it; that is unlikely here.</p>
+      </article>
+
+      <article id="freshlens">
+        <div class="problem-head">
+          <span class="badge b3">#3 · Score 22</span>
+          <h3>FreshLens — AI expiry intelligence for zero food waste</h3>
+        </div>
+
+        <h3>The problem</h3>
+        <p>US households waste ~30–40% of food purchased, often because “best by,” “sell by,” and “use by” get treated as hard expiry. Only “use by” relates to safety. USDA estimate: $444 per person per year thrown away while still safe. Existing apps need tedious manual entry and ignore storage conditions.</p>
+
+        <h3>Evidence of real pain</h3>
+        <ol>
+          <li><strong>Food waste tracking accuracy (2025):</strong> Technology alone doesn’t fix reporting if staff lack time, clarity, or incentive. <a href="https://exa.ai/library/publication/592zr4p3gdt">study</a></li>
+          <li><strong>IoT food waste review (MDPI 2023):</strong> Data quality, standardization, security, connectivity barriers. <a href="https://www.mdpi.com/2071-1050/15/4/3482">doi:10.3390/su15043482</a></li>
+          <li><strong>Technica 2025 postmortem (“freshly yours”):</strong> Receipt scanning and food-item verification were painful. <a href="https://github.com/candace-sun/technica-2025">github.com/candace-sun/technica-2025</a></li>
+          <li><strong>Re-Plate:</strong> Label formats vary; needed vision + OCR. <a href="https://github.com/Arjun-Mishra-312/re-plate">github.com/Arjun-Mishra-312/re-plate</a></li>
+        </ol>
+
+        <h3>Existing solutions and why they fail</h3>
+        <ul>
+          <li><strong>Too Good To Go / Flashfood:</strong> Business surplus, not household waste.</li>
+          <li><strong>Fridgely / NoWaste:</strong> Manual entry kills adoption; generic shelf life.</li>
+          <li><strong>Receipt scanners:</strong> Unreliable parsing; weak food-item mapping.</li>
+        </ul>
+        <div class="callout warn"><strong>The gap:</strong> No tool lets you point a camera at the fridge and get real (not label) expiry plus “use first” recipes.</div>
+
+        <h3>Proposed solution direction</h3>
+        <p><strong>FreshLens</strong> — camera on fridge / pantry. Claude Vision IDs items, estimates remaining freshness from type + storage, then a prioritized use-first list with recipes.</p>
+        <p><strong>Demo:</strong> snap fridge → “peppers ~2 days; yogurt fine (best-by is quality, not safety); tonight: stuffed peppers.”</p>
+
+        <h3>Judging / judges</h3>
+        <ul>
+          <li>Originality medium-high. Risk: “another food waste app” if positioning slips. Lead with “your food is still safe.”</li>
+          <li>Photo Cook won 2nd in 2022 with picture-of-ingredients → recipe. This panel has rewarded that UX.</li>
+        </ul>
+
+        <div class="callout warn">
+          <strong>Risks.</strong> Vision may confuse similar foods — test in 48 hours. Generic recipes flatten the demo. Camera permissions can fail live. Mitigation: pre-captured images as fallback.
+        </div>
+        <p><strong>Competitive positioning:</strong> Photo Cook clones will cluster. Moat is expiry science, not “what can I cook.”</p>
+      </article>
+
+      <h2 id="p5">Phase 5 — Final recommendation</h2>
+      <div class="callout bet">
+        <h3>Bet on WellSafe — private well water risk intelligence</h3>
+        <p>It has the highest total score (25), driven by five 2024–2025 peer-reviewed studies and the widest solution gap: no consumer tool does this. The architecture is the most demo-stable of the three — web app, public APIs, Claude text synthesis — no camera, no satellite rasters, no ambiguous computer vision. It is the most original in this field: judges will have seen food-waste apps and dashboards; they will not have seen a well-water risk predictor. The 3-minute story is brutal: “23 million Americans don’t know what’s in their water. EPA can’t help them. Enter your address. Now you know.” Claude use is deep and natural (multi-source synthesis, not a chatbot wrapper), which fits a Claude-sponsored event.</p>
+        <p><strong>Biggest risk:</strong> data coverage. If the demo address falls in a gap, the experience breaks. Pre-load 3–4 counties with known contamination and build an insufficient-data fallback.</p>
+        <p><strong>First 72 hours:</strong> (1) verify EPA PFAS source API and USGS groundwater coverage; (2) build geocoding → fusion for one demo county; (3) get Claude generating a sample report from real data. If data access works, this project wins.</p>
+      </div>
+
+      <footer>Converted from <code>outputs/nextstep-2026-strategy.md</code>. Open this file in a browser.</footer>
+    </main>
+  </div>
+</body>
+</html>

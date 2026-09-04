@@ -1,0 +1,78 @@
+/**
+ * CoolBlock design tokens.
+ * Source of truth: COOLBLOCK-BUILD-PLAN.md §8 (Design system & frontend direction).
+ * Two surfaces share this one token layer (§8.1): the marketing site (light,
+ * editorial, "paper") and the app (dark, technical, "instrument"). Do not add
+ * a second token file -- add a data-surface scope below instead.
+ */
+
+:root {
+  /* ---------------------------------------------------------------------
+   * Ground -- app (dark, "instrument")
+   * --------------------------------------------------------------------- */
+  --bg-0: #0a0c0f; /* canvas */
+  --bg-1: #12151a; /* panel */
+  --bg-2: #1a1f26; /* raised */
+
+  /* ---------------------------------------------------------------------
+   * Ground -- marketing (light, "paper")
+   * --------------------------------------------------------------------- */
+  --paper-0: #faf8f5;
+  --paper-1: #ffffff;
+  --ink-0: #14171c;
+
+  /* ---------------------------------------------------------------------
+   * Thermal scale -- perceptually uniform (inferno/lajolla family), CVD-safe.
+   * §8.2: no rainbow ramp -- it is perceptually non-uniform and misleading.
+   * Colour is never the only encoding (§8.2): every thermal value also
+   * renders as a number on hover and in the table view (§8.6).
+   * --------------------------------------------------------------------- */
+  --t-00: #0b0a1f;
+  --t-20: #3b0f70;
+  --t-40: #8c2981;
+  --t-60: #de4968;
+  --t-80: #fe9f6d;
+  --t-100: #fcfdbf;
+
+  /* ---------------------------------------------------------------------
+   * Semantic
+   * --------------------------------------------------------------------- */
+  --cool: #4cc9c0; /* cooling delivered / positive delta */
+  --equity: #f4b860; /* vulnerability emphasis */
+  --warn: #e86a5c;
+  --ok: #6bcb77;
+
+  /* ---------------------------------------------------------------------
+   * Typography (§8.3)
+   * Faces are loaded where used (apps/web) -- these are the role tokens.
+   * Tabular numerals are mandatory anywhere a number can change (§8.3).
+   * --------------------------------------------------------------------- */
+  --font-display: "Instrument Serif", "Fraunces", ui-serif, Georgia, serif;
+  --font-ui: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --font-feature-ui: "ss01", "cv05", "tnum";
+  --type-ratio: 1.25; /* modular scale */
+  --measure-max: 68ch;
+  --leading-body: 1.55;
+  --leading-display: 1.1;
+
+  /* ---------------------------------------------------------------------
+   * Motion (§8.4) -- tokens, not ad-hoc values. Nothing animates longer than
+   * --d-slow except deliberate narrative moments (marketing scroll story).
+   * prefers-reduced-motion is honoured everywhere these are consumed.
+   * --------------------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* entrances */
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1); /* transforms */
+
+  --d-fast: 120ms;
+  --d-base: 240ms;
+  --d-slow: 480ms;
+  --d-story: 900ms;
+
+  --spring-site-stiffness: 260;
+  --spring-site-damping: 26;
+
+  --stagger-step: 40ms;
+  --stagger-cap: 12; /* items, then batch */
+}

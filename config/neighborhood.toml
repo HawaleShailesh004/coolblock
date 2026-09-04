@@ -1,0 +1,81 @@
+# =============================================================================
+# THE SCOPE LOCK
+# =============================================================================
+# This file names the one neighborhood CoolBlock is built for, end to end.
+# Per COOLBLOCK-BUILD-PLAN.md §1.3: "One neighborhood, end to end, beats five
+# cities half-working." Decided once (2026-09-04), recorded here, never
+# revisited before Phase 15 (generalization, post-MUST-ship).
+#
+# Do not add a second [neighborhood] table. Do not parameterize this file for
+# multiple cities. A second city is a config file swap driving the same
+# pipeline, attempted only after Phases 0-14 are done (§10, Phase 15).
+# =============================================================================
+
+[neighborhood]
+id = "edison-eastlake-phoenix-az"
+name = "Edison-Eastlake"
+city = "Phoenix"
+state = "AZ"
+country = "US"
+
+# Rationale (COOLBLOCK-BUILD-PLAN.md §3.1):
+# - Phoenix runs the only municipal Office of Heat Response and Mitigation in the US.
+# - Maricopa County publishes annual heat-associated death counts (govt epidemiology, not a vendor blog).
+# - Phoenix's Tree and Shade Master Plan set a 25% canopy goal the city is visibly missing.
+# - Edison-Eastlake: low canopy, high vulnerability, federally-funded transformation programme ->
+#   unusually rich and public parcel/planning/demographic data.
+locked_rationale = """
+Phoenix runs the only municipal Office of Heat Response and Mitigation in the US.
+Maricopa County publishes annual heat-associated death counts. Phoenix's Tree and
+Shade Master Plan set a 25% canopy goal the city is visibly missing. Edison-Eastlake
+specifically has low canopy, high vulnerability, and a federally-funded transformation
+programme, meaning parcel data, planning documents and demographic detail are
+unusually rich and public.
+"""
+
+# Alternates on record if Phoenix data blocks (verify Maricopa County parcels in
+# hour 1 of Phase 1 -- see R3 in the risk register):
+#   1. Baltimore, MD      - excellent open data + canonical redlining-heat literature
+#   2. Richmond, VA        - the Hoffman et al. redlining-heat study is set here
+#   3. LA Westlake / Pico-Union - LA GeoHub is outstanding
+alternates = ["baltimore-md", "richmond-va", "la-westlake-pico-union"]
+
+# -----------------------------------------------------------------------------
+# Geographic extent
+# -----------------------------------------------------------------------------
+# Approximate Edison-Eastlake district bounding box, Phoenix, AZ.
+# WGS84 (EPSG:4326) at the API/ingest boundary only -- every downstream module
+# reprojects immediately to the canonical local UTM zone (rule §5.1.2).
+[neighborhood.bbox_wgs84]
+min_lon = -112.0665
+min_lat = 33.4460
+max_lon = -112.0450
+max_lat = 33.4640
+
+[neighborhood.crs]
+# The one canonical CRS for all derived data. WGS84 exists only at the API boundary.
+target_epsg = 32612          # UTM Zone 12N (covers Phoenix, AZ)
+wgs84_epsg = 4326             # ingest/API boundary only
+grid_resolution_m = 10        # canonical raster target grid (§5.1.4)
+grid_origin_note = "Fixed origin defined once in engine.ingest.grid; every raster reprojected onto it."
+
+[neighborhood.timezone]
+iana = "America/Phoenix"
+utc_offset_no_dst = "-07:00"  # Arizona does not observe DST
+
+# -----------------------------------------------------------------------------
+# Local institutions named in the product (theme statement: "collaborate with
+# local organizations" -- satisfied by naming them, not by roleplaying them)
+# -----------------------------------------------------------------------------
+[neighborhood.institutions]
+heat_office = "City of Phoenix Office of Heat Response and Mitigation"
+county_health = "Maricopa County Department of Public Health"
+canopy_plan = "Phoenix Tree and Shade Master Plan (25% canopy goal by 2030)"
+transformation_program = "Edison-Eastlake Community Transformation Plan (Choice Neighborhoods)"
+
+# -----------------------------------------------------------------------------
+# Data source endpoints specific to this city (see docs/DATA-SOURCES.md D6, D15)
+# -----------------------------------------------------------------------------
+[neighborhood.sources]
+county_parcels = "Maricopa County Assessor open-data portal"   # D6 -- verify hour 1, Risk R3
+city_open_data = "Phoenix Open Data (city.phoenix.gov)"          # D15

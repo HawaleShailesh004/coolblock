@@ -1,0 +1,54 @@
+# --- Node / JS ---
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.uv/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Data (cache/derived are reproducible via `make ingest`; never commit large binaries) ---
+data/cache/*
+!data/cache/.gitkeep
+data/derived/*
+!data/derived/.gitkeep
+*.tif
+*.tiff
+*.parquet
+*.pmtiles
+
+# --- Editors / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Secrets ---
+*.pem
+*.key
+secrets.*
+
+# --- Docker ---
+.minio/
