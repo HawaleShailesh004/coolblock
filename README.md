@@ -40,6 +40,10 @@ dependencies, and starts the Next.js app + FastAPI dev servers.
 If port 8000 is already taken by something else on your machine, run
 `API_PORT=8001 make dev` and update `NEXT_PUBLIC_API_URL` in `.env` to match.
 
+**No `make` on Windows?** Install it (`choco install make` or `scoop install make`)
+or run the Makefile's steps directly: `docker compose up -d --wait`, then
+`pnpm install && uv sync --all-packages --all-extras`, then `bash scripts/dev.sh`.
+
 Individual pieces:
 
 ```bash
