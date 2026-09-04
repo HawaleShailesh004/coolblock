@@ -15,9 +15,16 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 0 — Foundations.** The monorepo, local dev stack, design tokens, and
-CI are scaffolded. The science (`engine/`) and the product surface
-(`apps/`) are not yet built — see the plan's 16 phases for what's next.
+**Phase 1 — Data foundry: complete.** Phase 0 (monorepo, local dev stack,
+design tokens, CI) is done. All 16 data-contract sources are accounted for
+— 15 live via `engine/ingest/` (`make ingest`), one (D5) deliberately
+superseded by another source, documented in
+[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md). The CRS invariant test is
+green, the canonical 10 m grid is defined once, and
+[`notebooks/00-phase1-data-check.ipynb`](notebooks/00-phase1-data-check.ipynb)
+renders every layer stacked over the neighborhood, aligned. The thermal
+surface, plantable-space model, optimizer, and product UI (Phases 2-9) are
+next — see the plan's 16 phases.
 
 ## Quickstart
 
