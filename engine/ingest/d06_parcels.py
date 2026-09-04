@@ -10,9 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import geopandas as gpd
-import httpx
 
 from engine.config import load_neighborhood_config
+from engine.ingest.arcgis import query_layer_by_bbox
 from engine.ingest.crs import to_canonical_crs_vector
 from engine.ingest.manifest import is_cached, version_dir, write_manifest
 
@@ -32,49 +32,12 @@ OUT_FIELDS = [
     "CONST_YEAR",
     "SUBNAME",
 ]
-PAGE_SIZE = 1000
-REQUEST_TIMEOUT_S = 30
-
-
 def fetch_raw() -> gpd.GeoDataFrame:
-    """Paginate the ArcGIS REST query until exceededTransferLimit clears."""
     cfg = load_neighborhood_config()
-    bbox = cfg.bbox_wgs84
-    features: list[dict[str, object]] = []
-    offset = 0
-
-    while True:
-        resp = httpx.get(
-            SERVICE_URL,
-            params={
-                "geometry": f"{bbox.min_lon},{bbox.min_lat},{bbox.max_lon},{bbox.max_lat}",
-                "geometryType": "esriGeometryEnvelope",
-                "inSR": 4326,
-                "spatialRel": "esriSpatialRelIntersects",
-                "outFields": ",".join(OUT_FIELDS),
-                "returnGeometry": "true",
-                "resultRecordCount": PAGE_SIZE,
-                "resultOffset": offset,
-                "f": "geojson",
-            },
-            timeout=REQUEST_TIMEOUT_S,
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        if "error" in payload:
-            raise RuntimeError(f"Maricopa parcels query failed: {payload['error']}")
-
-        batch = payload.get("features", [])
-        features.extend(batch)
-        exceeded = payload.get("properties", {}).get("exceededTransferLimit", False)
-        if not batch or (not exceeded and len(batch) < PAGE_SIZE):
-            break
-        offset += PAGE_SIZE
-
-    if not features:
+    gdf = query_layer_by_bbox(SERVICE_URL, cfg.bbox_wgs84, out_fields=OUT_FIELDS)
+    if len(gdf) == 0:
         raise RuntimeError("Maricopa parcels query returned zero features for the locked bbox")
-
-    return gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
+    return gdf
 
 
 def validate(gdf: gpd.GeoDataFrame) -> None:
