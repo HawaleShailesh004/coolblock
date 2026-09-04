@@ -25,6 +25,8 @@ dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "structlog>=24.4",
+    "pyarrow>=17.0",
+    "osm2geojson>=0.3.2",
 ]
 
 [project.optional-dependencies]
