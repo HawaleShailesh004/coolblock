@@ -37,6 +37,9 @@ dependencies, and starts the Next.js app + FastAPI dev servers.
 - API: http://localhost:8000/health
 - MinIO console: http://localhost:9001
 
+If port 8000 is already taken by something else on your machine, run
+`API_PORT=8001 make dev` and update `NEXT_PUBLIC_API_URL` in `.env` to match.
+
 Individual pieces:
 
 ```bash

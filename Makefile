@@ -2,8 +2,9 @@
 
 # Bring up the full local stack: infra containers + JS dev servers + API dev server.
 # DoD (Phase 0): `make dev` brings up the full stack on a clean machine.
+# API_PORT overrides the default :8000 if something else on your machine already owns it.
 dev: up install
-	pnpm turbo run dev
+	bash scripts/dev.sh
 
 # Infra only: Postgres+PostGIS+pgvector, Redis, MinIO (local R2), TiTiler.
 up:

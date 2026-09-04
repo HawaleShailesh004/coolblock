@@ -2,7 +2,8 @@ name: coolblock
 
 services:
   postgres:
-    image: postgis/postgis:16-3.4
+    build: ./infra/postgres
+    image: coolblock-postgres-pgvector:16-3.4
     container_name: coolblock-postgres
     restart: unless-stopped
     environment:
