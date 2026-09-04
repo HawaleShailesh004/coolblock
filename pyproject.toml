@@ -27,6 +27,8 @@ dependencies = [
     "structlog>=24.4",
     "pyarrow>=17.0",
     "osm2geojson>=0.3.2",
+    "h5netcdf>=1.8.1",
+    "duckdb>=1.5.5",
 ]
 
 [project.optional-dependencies]
