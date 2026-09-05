@@ -414,13 +414,87 @@ Validated against real data: HVI ranges from −0.86 to +1.35 across the 23
 block groups, and correctly surfaces the block group with the highest raw
 SVI (0.98) as its highest-HVI block group.
 
+### D3 — exposure weighting
+
+`engine/equity/exposure.py` computes a per-building exposure multiplier —
+1.0 baseline, raised for real OSM-derived proximity (within 400m, a
+5-minute-walk transit-catchment radius) to bus stops
+(**×1.3**, transit riders wait outdoors unshaded) and schools (**×1.2**,
+children walk to and from them). Measured on real data: 4 distinct
+multiplier values occur across D1's residential buildings (1.0, 1.2, 1.3,
+1.56 for near-both), with the large majority of buildings (1,863 of 2,401)
+near a bus stop only — a real reflection of this neighborhood's dense bus
+network, not a modeling artifact.
+
+**Disclosed, exactly matching the plan's own framing** ("exposure
+multipliers derived from OSM features," not demographic microdata this
+project doesn't have):
+
+1. **No outdoor-worker exposure** — no ingested source identifies outdoor
+   workplaces in this bbox; omitted rather than faked.
+2. **The multipliers are planning judgments**, not fitted from
+   ridership/enrollment data — no such data is ingested for this
+   neighborhood.
+3. **Proximity is a population-wide proxy**, not a survey of who actually
+   rides transit or walks children to school from each specific building.
+
+### D4 — Equity-Weighted Cooling Benefit (EWCB)
+
+`engine/impact/ewcb.py` is the objective Phase 6's optimizer will
+maximize — the module that actually combines every other Phase 5 piece:
+
+    EWCB(S) = Σ_p  ΔT_S(x_p) · HVI(p) · exposure(p) · hours(p)
+
+C1's canopy ΔT and C3's cool-roof ΔT are each evaluated at real
+population points (D1's residential buildings, each carrying its block
+group's HVI from D2 and its own D3 exposure multiplier), summed and
+scaled by a constant 10-hour `hours(p)` (matching C2's design-day
+daylight window — the disclosed simplification that C1/C3's steady-state
+ΔT is treated as present for the full daylight window, since duration is
+what C2 already measures on its own).
+
+**Population attribution is mechanism-specific, and disclosed per type:**
+
+- **Canopy candidates** (`street_tree`, `park_lot_tree_cluster`): C1's
+  actual Gaussian ΔT(d) is evaluated at the true distance to every nearby
+  population point within its 3σ (90m) influence radius — the same
+  spatial footprint C1 itself models, not a flat per-candidate estimate.
+- **`cool_roof`**: attributed to the same building's own occupants, only
+  when that building is one of D1's *residential* buildings (spatially
+  joined back to its own footprint). Non-residential cool-roof candidates
+  (schools, offices — D1 only redistributes population onto residential
+  buildings) score `ewcb_person_degree_hours = 0`: no occupancy data
+  exists for them, so nothing is invented. Measured: 2,321 of 2,842
+  cool-roof candidates (82%) matched a residential building and scored
+  nonzero, consistent with D1's ~2,401 identified residential buildings.
+- **`cool_pavement`** and **`shade_structure`**: score exactly 0 — no
+  population-attribution model exists for either (a parking lot or a bus
+  shelter has no "occupants," and nothing links passers-by to a home
+  address). Their real benefit (ΔT / shade-hours) is still reported
+  directly by C3/C2 — EWCB's silence on them is a scope gap, not a claim
+  that they help nobody.
+
+**C2's shade-hours-delivered is deliberately not folded into this sum.**
+It is already a duration, a different kind of quantity from a ΔT field to
+be hours-weighted, and merging the two would require an unjustified
+conversion factor between "hours shaded" and "degrees cooled." Both
+numbers must travel together in any report or UI — EWCB does not
+supersede C2's metric.
+
+**EWCB can be negative, and that is intended, not a bug.** HVI is a
+z-score centered at 0 — roughly half of this neighborhood's block groups
+score below the neighborhood average and carry negative HVI. A candidate
+sited there produces a negative `ewcb_person_degree_hours` despite a
+strictly positive ΔT: the formula is an equity *weighting* of cooling
+against this neighborhood's own vulnerability distribution, not a pure
+magnitude. Measured on real candidates: canopy candidates range from
+about −2,948 to +9,027 person-degree-hours; cool-roof candidates range
+from about −20,993 to +10,945. Any UI or report copy must describe this
+number as cooling weighted by *relative* vulnerability, not as "degrees
+of cooling delivered" on its own.
+
 ## Sections (filled in as later phases land)
 
-- **Shade raytracing (C2)** and **the albedo model (C3)** (Phase 5) — the
-  design-day shadow sweep and shade-hours-to-pedestrian-surfaces metric,
-  and the surface-energy-balance albedo model with its Wolfram unit check
-  (or the fallback noted in `docs/adr/0002-*.md` if Wolfram access isn't
-  available yet). C1 (the canopy cooling kernel) is documented above.
 - **The optimizer** (Phase 6) — why this is submodular maximization under a
   knapsack constraint, the three solvers, the measured greedy/exact ratio,
   the baseline comparison and its result.
