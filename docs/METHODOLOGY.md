@@ -618,6 +618,38 @@ instance's overlap structure is evidently far more favorable to greedy
 than the worst case, which is itself worth stating plainly rather than
 implying the worst-case bound is what was measured.
 
+### E2 (third solver) — local search
+
+`engine/optimize/local_search.py` runs a bounded swap-based improvement
+pass on CELF's output: it repeatedly tries replacing the current
+selection's *least* valuable member (its exact marginal contribution,
+recomputed via `CoverageObjective.value()`, not its standalone gain) with
+the best-fitting candidate from a pool of the top `SWAP_POOL_SIZE`
+unselected candidates by standalone gain, keeping a swap only if it
+provably raises the objective.
+
+**Disclosed scope**: this is a bounded local search, not an exhaustive
+2-opt — checking every selected candidate against every unselected one
+for the full ~4,300-candidate universe would be millions of value
+recomputations. Restricting the swap-in pool to the highest-standalone-
+gain candidates is the honest tradeoff for running in real time, stated
+here rather than silently narrowed. Verified with a hand-built instance
+containing a deliberately obvious improving swap
+(`engine/tests/test_local_search.py`), confirming the search actually
+finds it.
+
+**Measured on real data**: on the same 100-candidate reduced instance,
+$20,000 budget used for the exact-solve comparison, local search applied
+1 swap in 2 iterations (10ms), raising the selection's value from 56,619
+(greedy alone) to 56,669 — closing part of the gap to HiGHS's proven
+exact optimum (56,821), from 99.64% to 99.73%. The improvement is real
+but modest here precisely *because* greedy already performs so well on
+this neighborhood's real data (§E2's earlier measurement) — there is
+simply little gap left to close, which is itself informative: local
+search's value depends on how far from optimal the starting solution
+already is, and CoolBlock's greedy starting point is usually already very
+close.
+
 ### E5 — the baselines: "the proof the product works"
 
 `engine/optimize/baselines.py` solves the same real candidate universe
@@ -666,7 +698,6 @@ why naive heat-ranking fails, not smoothed over.
 
 ### Deferred to a later iteration of Phase 6
 
-- **Local search improvement pass** (E2's third solver).
 - **Constraints** (E3): maintenance-cost cap, minimum spend per block
   group, max sites per block, public-land-only mode, species diversity,
   water-budget cap, mandatory inclusion/exclusion.
