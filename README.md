@@ -15,21 +15,22 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 3 — Heat engine: complete.** Phases 0 (foundations), 1 (data
+**Phase 4 — Plantable space: complete.** Phases 0 (foundations), 1 (data
 foundry — all 16 data-contract sources, see
-[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), and 2 (the map, first
-light — real 3D buildings/roads/parcels on a self-hosted basemap at
-`/map`) are done. The heat surface is real and validated: a cloud-masked
-Landsat composite, TsHARP downscaling 30m→10m (R²=0.22, RMSE=0.94°C,
-spatial CV), and a three-check validation gate. **The gate passed 2 of 3
-checks — per the honesty rail, the product's language is "prioritization
-score," not "predicted cooling," until the third check is re-run against
-better ground truth.** Full numbers:
-[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md),
-[`notebooks/01-thermal-validation.ipynb`](notebooks/01-thermal-validation.ipynb).
-The surface renders live at `/map` as a real raster layer via TiTiler.
-Plantable space, the impact/equity model, and the optimizer (Phases 4-9)
-are next — see the plan's 16 phases.
+[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), 2 (the map, first light),
+and 3 (the heat engine — validated 2/3, honesty rail applied, see
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)) are done. The rule-based
+plantable-space layer (ML fusion deferred, see
+[`docs/adr/0005-*.md`](docs/adr/0005-plantable-space-rule-first.md))
+identifies 1,481 real polygons (301 ha, 52% of the neighborhood) from
+NAIP, OSM buildings/roads/parking/trees, generating **1,472 candidates**
+(street trees, tree clusters, shade structures) with real ownership
+classification. A manual spot-check against aerial imagery found and
+fixed a real gap (untagged parking lots) and disclosed a residual 6.7%
+error rate from OSM data completeness — see
+[`notebooks/02-plantable-space.ipynb`](notebooks/02-plantable-space.ipynb).
+Toggle "Plantable space" at `/map` to see it live. The impact/equity model
+and the optimizer (Phases 5-9) are next — see the plan's 16 phases.
 
 ## Quickstart
 

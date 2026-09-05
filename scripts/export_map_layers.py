@@ -20,6 +20,7 @@ from pathlib import Path
 import geopandas as gpd
 from engine.ingest import d04_osm, d06_parcels
 from engine.ingest.manifest import version_dir
+from engine.surface.candidates import generate_candidates
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO_ROOT / "data" / "derived" / "edison-eastlake"
@@ -121,8 +122,25 @@ def export_parcels() -> Path:
     return out_path
 
 
+def export_candidates() -> Path:
+    """Phase 4 plantable-space candidates (engine.surface). Every feature
+    carries `intervention_type`, `ownership`, `capacity`, and cost fields --
+    the map's context panel shows these on click so a candidate's basis is
+    never hidden behind a colour."""
+    gdf = generate_candidates()
+    out = gdf.to_crs(epsg=4326)
+    out_path = OUT_DIR / "candidates.geojson"
+    out.to_file(out_path, driver="GeoJSON")
+    return out_path
+
+
 def main() -> None:
-    for label, fn in [("buildings", export_buildings), ("roads", export_roads), ("parcels", export_parcels)]:
+    for label, fn in [
+        ("buildings", export_buildings),
+        ("roads", export_roads),
+        ("parcels", export_parcels),
+        ("candidates", export_candidates),
+    ]:
         path = fn()
         size_kb = path.stat().st_size / 1024
         print(f"{label}: {path} ({size_kb:.0f} KB)")

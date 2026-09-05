@@ -10,6 +10,14 @@ export {
   writeViewStateToUrl,
 } from "./viewState";
 export type { MapViewState } from "./viewState";
-export { DEFAULT_LAYERS, buildingsLayer, createLayerRegistry, parcelsLayer, roadsLayer } from "./layers";
+export {
+  DEFAULT_LAYERS,
+  INTERVENTION_COLOR,
+  buildingsLayer,
+  candidatesLayer,
+  createLayerRegistry,
+  parcelsLayer,
+  roadsLayer,
+} from "./layers";
 export type { LayerRegistration } from "./layers";
 export { HEAT_SURFACE_COLORMAP, HEAT_SURFACE_RESCALE, buildHeatSurfaceTileUrl } from "./heatSurface";

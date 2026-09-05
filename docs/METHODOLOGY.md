@@ -80,10 +80,53 @@ D6, instead of OSM tags — flagged as Phase 5+ follow-up work). This is not
 a project failure; it is the validation gate doing its job, and it is
 disclosed rather than hidden.
 
+## Plantable space (Phase 4)
+
+**Status: rule layer only (B1 + B3); ML fusion (B2) deliberately deferred.**
+See `docs/adr/0005-plantable-space-rule-first.md`. Full numbers and figures:
+[`notebooks/02-plantable-space.ipynb`](../notebooks/02-plantable-space.ipynb).
+
+### Method
+
+From NAIP (0.6m), subtract buildings (+1m buffer), road carriageways
+(+lane buffer, by OSM highway class), off-street parking lots, and
+existing tree canopy — a proxy from real OSM tree points (832 of them)
+buffered by an assumed 4m crown radius, since a normalized surface model
+(DSM − DEM) needed to compute actual canopy *height* isn't available from
+currently ingested sources (D12 is bare-earth only). What's left —
+**1,481 polygons, 300.8 ha, 52% of the neighborhood** — is plantable.
+
+For each polygon: ownership (public right-of-way / public parcel / private,
+from a real parcel-owner-name join — 109 genuinely government-owned
+parcels identified, e.g. "PHOENIX CITY OF"), capacity (area ÷ spacing²),
+and feasible intervention types. **1,472 candidates**: 801 park/lot tree
+clusters, 649 street trees, 22 shade structures at bus stops. Cool
+pavement, cool roofs, and depave-to-bioswale are not generated — they
+target impervious surfaces the rule layer explicitly excludes, and need a
+different source polygon set (Phase 5/6 follow-up).
+
+### The manual spot-check (Phase 4 DoD)
+
+30 random candidates, checked against real NAIP image chips, twice:
+
+- **Round 1** found a real paved, striped parking lot flagged as
+  plantable. Traced to a genuine gap — the original rule layer excluded
+  roads (linear highway features) and buildings, but not off-street
+  parking lots, a distinct OSM feature type. Fixed: added a dedicated
+  Overpass query for `amenity=parking` (57 real polygons, 17.8 ha) and
+  excluded them.
+- **Round 2** (fresh random sample, seed=7, after the fix): **2 of 30**
+  still showed real paved lots with visible cars — traced to those
+  specific lots not being tagged `amenity=parking` in OpenStreetMap at
+  all. This is OSM tagging *incompleteness*, not a repeat of the same
+  logic gap, and there is no complete ground-truth parking-lot layer
+  available to close it fully.
+
+**Error rate: 2/30 = 6.7%**, attributable to open-data completeness, not
+the rule layer's logic. Disclosed rather than chased indefinitely.
+
 ## Sections (filled in as later phases land)
 
-- **Plantable space** (Phase 4) — rule layer vs. ML layer, the fusion rule,
-  the manual spot-check error rate.
 - **Cooling impact** (Phase 5) — the cooling kernel, its calibration on
   local LST-vs-canopy data, the shade raytrace method, the albedo model and
   its Wolfram unit check (or the fallback noted in `docs/adr/0002-*.md` if

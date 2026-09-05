@@ -13,7 +13,7 @@
 | D1 | Landsat 8/9 Collection 2 L2 | Surface temperature (`lwir11`), QA mask | Planetary Computer STAC | 30 m | **Live** — 63 scenes, summer 2021-2025 |
 | D2 | Sentinel-2 L2A | NDVI/NDBI/albedo predictors | Planetary Computer STAC | 10 m | **Live** — 1 least-cloudy scene/summer, 2021-2025 |
 | D3 | NAIP | 4-band RGB+NIR aerial imagery | Planetary Computer STAC | 0.6 m | **Live** — most recent acquisition, mosaicked across tiles |
-| D4 | OpenStreetMap / Overpass | Buildings, roads, land use, trees, amenities | Overpass API → GeoParquet | Vector | **Live** — 2,844 buildings, 2,734 roads, 208 landuse, 832 trees, 72 amenities |
+| D4 | OpenStreetMap / Overpass | Buildings, roads, land use, trees, amenities, parking lots | Overpass API → GeoParquet | Vector | **Live** — 2,844 buildings, 2,734 roads, 208 landuse, 832 trees, 72 amenities, 57 parking lots (added Phase 4, see note below) |
 | D5 | Microsoft Building Footprints | Footprints + height estimates | Azure Blob (`abfs://`), partitioned by country | Vector | **Superseded by D4.** See note below. |
 | D6 | Maricopa County Assessor parcels | Parcel geometry, ownership, land use code | County ArcGIS REST | Vector | **Live** — 2,956 parcels (R3 verified hour 1) |
 | D7 | Census ACS 5-year (2022) | Income, poverty, age, tenure, vehicle access | `api.census.gov` | Block group (poverty/vehicle: tract) | **Live** — 23 block groups, 9 tracts |
@@ -28,6 +28,14 @@
 | D16 | Literature corpus | The 5 papers + city plans, citation metadata | Manual, from the strategy brief | — | **Citations registered.** PDF acquisition + pgvector chunking deferred to Phase 10. |
 
 ## Notes on sources that didn't match their original one-line description
+
+**D4 — a parking-lot layer was added in Phase 4.** The Phase 4 manual
+spot-check (`docs/METHODOLOGY.md`) found a real paved parking lot flagged
+as plantable space, because the original D4 query captured roads (linear
+highway features) and buildings but not off-street parking lots, a
+distinct OSM feature type (`amenity=parking` as a polygon). Added a
+dedicated Overpass query; 57 real polygons, 17.8 ha, now excluded in
+`engine/surface/rule_layer.py`.
 
 **D5 (Microsoft Building Footprints) — superseded by D4.** Verified live: the
 Planetary Computer `ms-buildings` STAC item's exposed schema carries only a

@@ -84,6 +84,19 @@ _QUERY_TEMPLATES: dict[str, str] = {
         >;
         out skel qt;
     """,
+    # Added during Phase 4 (engine/surface/rule_layer.py): surface parking
+    # lots read as plantable bare ground without this -- neither "roads"
+    # (linear highway features) nor "buildings" (structures) captures them.
+    "parking": """
+        [out:json][timeout:60];
+        (
+          way["amenity"="parking"]({bbox});
+          relation["amenity"="parking"]({bbox});
+        );
+        out body;
+        >;
+        out skel qt;
+    """,
 }
 
 
