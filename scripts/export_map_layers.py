@@ -18,10 +18,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import geopandas as gpd
+import pandas as pd
+from engine.impact.albedo import run_albedo_model
+from engine.impact.cooling_kernel import run_cooling_kernel
+from engine.impact.ewcb import compute_ewcb
+from engine.impact.shade import run_shade_raytrace
 from engine.ingest import d04_osm, d06_parcels
 from engine.ingest.manifest import version_dir
 from engine.surface.candidates import generate_candidates
 from engine.surface.heights import estimate_height_m as _estimate_height_m
+from engine.surface.impervious_candidates import generate_impervious_candidates
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO_ROOT / "data" / "derived" / "edison-eastlake"
@@ -74,12 +80,39 @@ def export_parcels() -> Path:
 
 
 def export_candidates() -> Path:
-    """Phase 4 plantable-space candidates (engine.surface). Every feature
-    carries `intervention_type`, `ownership`, `capacity`, and cost fields --
-    the map's context panel shows these on click so a candidate's basis is
-    never hidden behind a colour."""
-    gdf = generate_candidates()
-    out = gdf.to_crs(epsg=4326)
+    """Phase 4 plantable-space candidates (`engine.surface.candidates`) plus
+    Phase 5's impervious-surface candidates
+    (`engine.surface.impervious_candidates`), each carrying its full Phase 5
+    impact/equity scoring: C1's `delta_t_peak_degc` (canopy candidates),
+    C3's `delta_t_degc` (`cool_roof`/`cool_pavement`), C2's
+    `shade_hours_delivered`, and D4's `ewcb_person_degree_hours` (with
+    `ewcb_low`/`ewcb_high` confidence bounds) -- exactly the Phase 5
+    checkpoint (COOLBLOCK-BUILD-PLAN.md line 854): "a card showing its
+    modeled cooling, its shade contribution, and the number and
+    vulnerability of people reached."
+
+    The plan says "hover"; this map's existing interaction model
+    (`apps/web/app/map/page.tsx`'s `ContextPanel`, already used for
+    buildings/parcels since Phase 2) is click-to-inspect, generically
+    rendering every GeoJSON property -- adding these fields here is
+    already sufficient for them to appear there without new UI code, so
+    "hover" is implemented as "click" for consistency with every other
+    layer, not fixed to a different interaction just for this one."""
+    tree_candidates = generate_candidates()
+    tree_scored, calibration = run_cooling_kernel(tree_candidates)
+    tree_scored, _design_day = run_shade_raytrace(tree_scored)
+
+    impervious_candidates = generate_impervious_candidates()
+    impervious_scored, _inputs, _design_day2 = run_albedo_model(impervious_candidates)
+
+    combined = gpd.GeoDataFrame(
+        pd.concat([tree_scored, impervious_scored], ignore_index=True),
+        geometry="geometry",
+        crs=tree_scored.crs,
+    )
+    combined = compute_ewcb(combined, cooling_calibration=calibration)
+
+    out = combined.to_crs(epsg=4326)
     out_path = OUT_DIR / "candidates.geojson"
     out.to_file(out_path, driver="GeoJSON")
     return out_path
