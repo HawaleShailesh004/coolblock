@@ -618,6 +618,52 @@ instance's overlap structure is evidently far more favorable to greedy
 than the worst case, which is itself worth stating plainly rather than
 implying the worst-case bound is what was measured.
 
+### E5 — the baselines: "the proof the product works"
+
+`engine/optimize/baselines.py` solves the same real candidate universe
+and budget with four naive/status-quo strategies, then scores each one's
+resulting selection with the exact same `CoverageObjective` (D4's EWCB)
+CoolBlock itself maximizes — an apples-to-apples comparison by
+construction, not a hand-picked metric:
+
+- **Spread evenly** — an equal dollar allocation per real Census block
+  group (D7b), spent on that zone's own candidates until exhausted.
+- **Worst-first** — candidates ranked by real downscaled 10m LST at their
+  own location, hottest first.
+- **Squeaky wheel** — randomized (seeded, reproducible), weighted by each
+  candidate's block group's real median household income (D7) — the
+  documented higher-income bias the name refers to.
+- **TES-score-only** — ranked by each candidate's block group's real Tree
+  Equity Score (D10, third-party mirror, `docs/adr/`-disclosed provenance
+  already at ingestion), lowest score (worst tree equity) first.
+
+**Measured on real data, at real budgets:**
+
+| Strategy | $20,000 budget | $100,000 budget |
+|---|---|---|
+| Squeaky wheel | 0.1 | 0.1 |
+| Spread evenly | 992 | 1,417 |
+| Worst-first | 2,650 | 2,650 |
+| TES-score-only | 12,328 | 15,992 |
+| **CoolBlock** | **57,064** | **223,852** |
+
+CoolBlock beats TES-score-only — the best existing tool — by **4.6× at
+$20k and 14.0× at $100k**, and beats every other baseline by a much wider
+margin. This clears the plan's own bar ("if CoolBlock does not beat
+TES-score-only by a clear margin, we have not built anything") decisively.
+
+**A genuinely informative, not just favorable, finding**: worst-first's
+value is *identical* at both budgets (2,650) — it doesn't improve with 5×
+more money. The reason is real, not an artifact: ranking purely by local
+heat has no way to know that `cool_pavement` and `shade_structure`
+candidates carry zero EWCB attribution in this phase's scope
+(`docs/adr/0010-*.md`) — and impervious surfaces (parking lots, existing
+pavement) are exactly the *hottest* locations, so "plant where it's
+hottest" spends most of its budget on candidate types that are
+structurally incapable of scoring under this objective. This is worth
+stating in the product's own comparison screen as a real insight about
+why naive heat-ranking fails, not smoothed over.
+
 ### Deferred to a later iteration of Phase 6
 
 - **Local search improvement pass** (E2's third solver).
@@ -625,7 +671,6 @@ implying the worst-case bound is what was measured.
   group, max sites per block, public-land-only mode, species diversity,
   water-budget cap, mandatory inclusion/exclusion.
 - **The efficient frontier** (E4): a $5k-$500k budget sweep.
-- **The five baselines and uplift comparison** (E5).
 - **Wolfram `NMaximize` independent cross-check** (§7.2.3) — deferred the
   same way as every other Wolfram-dependent piece this session
   (`docs/adr/0002-*.md`).
