@@ -15,17 +15,21 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 2 — The map, first light: complete.** Phases 0 (foundations) and 1
-(data foundry — all 16 data-contract sources, see
-[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)) are done. The real
-Edison-Eastlake neighborhood renders in 3D at `/map`: a self-hosted
-Protomaps basemap (`scripts/build_basemap.sh`), 2,844 real buildings
-extruded (measured height where OSM has it, a disclosed estimate
-otherwise — see `docs/adr/0003-*.md`), 2,734 roads, 2,956 parcels, a
-layer-registry architecture for Phase 4+ layers to plug into, a working
-command palette (⌘K), click-to-inspect, and URL-shareable camera state.
-The thermal surface, plantable-space model, and optimizer (Phases 3-9) are
-next — see the plan's 16 phases.
+**Phase 3 — Heat engine: complete.** Phases 0 (foundations), 1 (data
+foundry — all 16 data-contract sources, see
+[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), and 2 (the map, first
+light — real 3D buildings/roads/parcels on a self-hosted basemap at
+`/map`) are done. The heat surface is real and validated: a cloud-masked
+Landsat composite, TsHARP downscaling 30m→10m (R²=0.22, RMSE=0.94°C,
+spatial CV), and a three-check validation gate. **The gate passed 2 of 3
+checks — per the honesty rail, the product's language is "prioritization
+score," not "predicted cooling," until the third check is re-run against
+better ground truth.** Full numbers:
+[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md),
+[`notebooks/01-thermal-validation.ipynb`](notebooks/01-thermal-validation.ipynb).
+The surface renders live at `/map` as a real raster layer via TiTiler.
+Plantable space, the impact/equity model, and the optimizer (Phases 4-9)
+are next — see the plan's 16 phases.
 
 ## Quickstart
 
@@ -42,8 +46,9 @@ Cloudflare R2), and TiTiler via Docker Compose, installs JS and Python
 dependencies, and starts the Next.js app + FastAPI dev servers.
 
 - Web: http://localhost:3000
-- Map: http://localhost:3000/map (first run: `uv run python scripts/export_map_layers.py`
-  and `bash scripts/build_basemap.sh` to populate `data/derived/edison-eastlake/`)
+- Map: http://localhost:3000/map (first run: `uv run python scripts/export_map_layers.py`,
+  `bash scripts/build_basemap.sh`, and `uv run python scripts/export_heat_surface.py`
+  to populate `data/derived/edison-eastlake/` and MinIO)
 - API: http://localhost:8000/health
 - MinIO console: http://localhost:9001
 
