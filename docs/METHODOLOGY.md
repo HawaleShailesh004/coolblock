@@ -650,6 +650,41 @@ search's value depends on how far from optimal the starting solution
 already is, and CoolBlock's greedy starting point is usually already very
 close.
 
+### A real, disclosed finding: the unconstrained solve is cool-roof-heavy
+
+Testing the constraints module (below) against the unconstrained solve
+surfaced something worth stating plainly rather than only in a code
+comment: **at a $50,000 budget, CoolBlock's unconstrained solve selects
+47 candidates, and all 47 are `cool_roof`** — zero trees. Investigated,
+not assumed: this is a real, correct consequence of the objective's
+construction, not a bug.
+
+C1's canopy ΔT (0.1-7.9°C, `docs/METHODOLOGY.md`'s C1 section) is already
+an *area-diluted ambient* effect — a Gaussian kernel spreading one tree's
+cooling over a ~2,827m² neighborhood. C3's cool-roof ΔT (mean ≈12.9°C,
+C3's section above) is the retrofit's own *undiluted surface* temperature
+change at its own footprint — a fundamentally different physical
+quantity, as already disclosed when C3 was built (`docs/adr/0009-*.md`,
+`docs/adr/0012-*.md`). Combining both directly into one coverage
+objective, without a further normalization this project has no data to
+justify, means cool-roof's much larger raw ΔT number dominates
+cost-effectiveness by a wide margin at every budget tested — the
+optimizer is doing exactly what the objective asks it to, but the
+objective is comparing two quantities that are not on equal footing.
+
+**Not fixed by inventing a conversion factor between "surface ΔT" and
+"ambient ΔT"** — nothing in this project's ingested data supports one, and
+guessing would be worse than disclosing the limitation directly, per the
+project's own honesty-rail posture. Two honest paths forward for a later
+phase: (a) recalibrate C3's ΔT onto an ambient-equivalent basis using a
+real convective mixing model (would need boundary-layer data this project
+doesn't have), or (b) treat "surface hardening interventions" and "canopy
+interventions" as two separate objectives/budgets in the UI rather than
+one combined ranking. Neither is implemented this phase; this section
+exists so nobody mistakes an all-cool-roof recommendation for a
+demonstration bug rather than a real, disclosed property of the current
+model.
+
 ### E5 — the baselines: "the proof the product works"
 
 `engine/optimize/baselines.py` solves the same real candidate universe
@@ -696,12 +731,127 @@ structurally incapable of scoring under this objective. This is worth
 stating in the product's own comparison screen as a real insight about
 why naive heat-ranking fails, not smoothed over.
 
+### E3 — constraints: "all real, all user-facing"
+
+`engine/optimize/constraints.py` implements five of the plan's real
+constraints against this neighborhood's actual data: an annual
+maintenance-cost cap ($75/yr per planted tree, the plan's own cost-table
+figure; $0/yr — not modeled, disclosed as such — for cool-roof/
+cool-pavement/shade-structure), a minimum spend per real Census block
+group (an equity floor), a maximum sites per block group (dispersion), a
+public-land-only mode (the real `ownership` column already computed by
+Phase 4's candidate generation), and mandatory inclusion/exclusion of
+specific candidates. **Not implemented, disclosed rather than faked**:
+species diversity (no per-species/genus data exists for any candidate —
+they are generic `street_tree` records, not species-level plantings) and
+a water-budget cap (no irrigation/evapotranspiration demand estimate is
+ingested anywhere in this project).
+
+Side constraints break CELF's lazy-heap invariant (a cached marginal gain
+can't be trusted stale once a per-zone cap could newly bind), so this is
+a non-lazy constrained greedy — still ranked by marginal gain per dollar
+(cost-effectiveness), matching E2's CELF. **A real bug was caught by
+cross-checking this solver's unconstrained output against CELF's on
+identical inputs**: an early version ranked by raw marginal gain instead
+of gain-per-dollar, understating the unconstrained value by 38% (81,687 vs
+CELF's 134,977 at $50,000). Fixed to match CELF's ranking exactly —
+verified the unconstrained mode now reproduces CELF's value bit-for-bit.
+
+**Measured on real data, $50,000 budget:**
+
+| Constraint | Value | vs. unconstrained |
+|---|---|---|
+| None (reference) | 134,978 | — |
+| Public-land-only | 62,573 | −54% |
+| Max 3 sites/block group | 19,627 | −85% |
+| Min $500 spend/block group | 97,969 | −27% |
+| Maintenance cap $2,000/yr | 134,978 | 0% (never binds — see below) |
+
+Every real constraint costs real EWCB, as expected — equity floors and
+dispersion requirements are trading some efficiency for a real planning
+goal, exactly the tradeoff a city would actually face. The maintenance
+cap not binding is not an error: at $50,000 unconstrained, all 47 selected
+candidates are `cool_roof` (see below), which carries $0/yr assumed
+maintenance, so a $2,000/yr cap has nothing to constrain.
+
+### A real, disclosed finding: the unconstrained solve is cool-roof-heavy
+
+Testing the constraints module against the unconstrained solve surfaced
+something worth stating plainly rather than only in a code comment: **at
+a $50,000 budget, CoolBlock's unconstrained solve selects 47 candidates,
+and all 47 are `cool_roof`** — zero trees. Investigated, not assumed:
+this is a real, correct consequence of the objective's construction, not
+a bug.
+
+C1's canopy ΔT (0.1-7.9°C) is already an *area-diluted ambient* effect —
+a Gaussian kernel spreading one tree's cooling over a ~2,827m²
+neighborhood. C3's cool-roof ΔT (mean ≈12.9°C) is the retrofit's own
+*undiluted surface* temperature change at its own footprint — a
+fundamentally different physical quantity, as already disclosed when C3
+was built (`docs/adr/0009-*.md`, `docs/adr/0012-*.md`). Combining both
+directly into one coverage objective, without a further normalization
+this project has no data to justify, means cool-roof's much larger raw ΔT
+dominates cost-effectiveness by a wide margin at every budget tested — the
+optimizer is doing exactly what the objective asks it to, but the
+objective is comparing two quantities that are not on equal footing.
+
+**Not fixed by inventing a conversion factor between "surface ΔT" and
+"ambient ΔT"** — nothing in this project's ingested data supports one, and
+guessing would be worse than disclosing the limitation directly. Two
+honest paths forward for a later phase: (a) recalibrate C3's ΔT onto an
+ambient-equivalent basis using a real convective mixing model (would need
+boundary-layer data this project doesn't have), or (b) treat
+"surface-hardening interventions" and "canopy interventions" as two
+separate objectives/budgets in the UI rather than one combined ranking.
+Neither is implemented this phase; the more "balanced" portfolios the E3
+constraints table above shows (public-land-only, max-sites-per-zone) are
+a *side effect* of removing high-cost-effectiveness cool-roof candidates
+from eligibility, not a fix to the underlying ΔT-comparability issue —
+`docs/adr/0014-*.md` records this distinction explicitly so it is never
+mistaken for one.
+
+### E4 — the efficient frontier
+
+`engine/optimize/frontier.py` re-solves the real candidate universe with
+E2's CELF greedy across a $5,000-$500,000 sweep (51 points, $10k steps,
+the plan's own stated range) — "the single most persuasive artefact for
+the business-strategy judge... diminishing returns, marginal cost of
+outcome." Every budget point is solved **fresh**, not incrementally
+extended from the previous point: `solve()` picks the better of
+cost-effective greedy and the single best affordable candidate
+(`engine.optimize.celf`), and which strategy wins can differ between
+budgets, so a larger budget's selection is not guaranteed to be a
+superset of a smaller one's — re-solving is the honest choice over
+assuming nesting the solver itself doesn't guarantee.
+
+**A real off-by-one was caught building this**: computing the sweep's
+step count as `round((500,000-5,000)/10,000)+1` silently overshot to
+$505,000 (495,000/10,000 = 49.5 is not an integer, and Python's
+round-half-to-even rounds it up) — caught by a test asserting the sweep's
+last point equals exactly $500,000, not "close to." Fixed by generating
+steps up to (not including) the max and appending the exact max
+explicitly (`docs/adr/0015-*.md`).
+
+**Measured on real data** — a clean diminishing-returns curve, exactly
+the shape the plan's framing describes:
+
+| Budget | EWCB | Candidates | Marginal EWCB / $1,000 |
+|---|---|---|---|
+| $5,000 | 14,869 | 6 | 2,973.8 |
+| $105,000 | 230,505 | 91 | 1,316.4 |
+| $205,000 | 322,875 | 128 | 495.0 |
+| $305,000 | 342,687 | 161 | 66.5 |
+| $405,000 | 348,498 | 252 | 47.5 |
+| $500,000 | 351,634 | 275 | 37.2 |
+
+Marginal value per $1,000 falls by nearly two orders of magnitude across
+the sweep (2,974 → 37) — the neighborhood's real, finite pool of
+high-cost-effectiveness candidates (largely `cool_roof`, per the finding
+above) gets exhausted well before $500k, after which additional spend
+buys markedly less. The full 51-point sweep solves in ~2.5 seconds total.
+
 ### Deferred to a later iteration of Phase 6
 
-- **Constraints** (E3): maintenance-cost cap, minimum spend per block
-  group, max sites per block, public-land-only mode, species diversity,
-  water-budget cap, mandatory inclusion/exclusion.
-- **The efficient frontier** (E4): a $5k-$500k budget sweep.
 - **Wolfram `NMaximize` independent cross-check** (§7.2.3) — deferred the
   same way as every other Wolfram-dependent piece this session
   (`docs/adr/0002-*.md`).

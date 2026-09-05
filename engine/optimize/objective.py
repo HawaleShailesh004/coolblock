@@ -36,6 +36,17 @@ EWCB numbers are untouched by this -- this is strictly an internal
 requirement of the optimizer's objective, not a change to what gets
 reported per candidate.
 
+**A real, disclosed consequence: cool-roof candidates dominate the
+unconstrained solve.** C1's canopy ΔT is already area-diluted (a Gaussian
+kernel spreading one tree's effect over its influence radius); C3's
+cool-roof ΔT is the retrofit's own undiluted surface temperature change.
+Combining both directly into this one coverage function, with no
+normalization between them, means cool-roof's much larger raw ΔT
+dominates cost-effectiveness at every budget tested (measured: 100% of a
+$50,000 unconstrained solve). Not patched here with an invented
+conversion factor -- see `docs/adr/0014-*.md` for the full investigation
+and why disclosure, not a fabricated fix, was the right call.
+
 **Population attribution inherits D4's disclosed scope exactly.**
 `cool_pavement` and `shade_structure` candidates get an empty influence
 set (no population point they measurably benefit under this objective),
