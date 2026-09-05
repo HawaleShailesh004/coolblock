@@ -579,11 +579,47 @@ and it passes. Benefit-monotone-in-budget is checked the same way.
 second; `solve()` takes 0.05-0.2 seconds across budgets from $5,000 to $5
 million — well inside the DoD's "< 8s for the full neighborhood" bar.
 
+### E2 (second solver) — exact MILP solve, and the measured ratio
+
+`engine/optimize/exact.py` solves the coverage objective exactly with
+HiGHS (`highspy`), on a **reduced instance** (`MAX_EXACT_CANDIDATES = 300`,
+matching the plan's own "~300 candidates" spec) selected by
+`reduce_instance()` — the candidates with the highest standalone marginal
+gain, so the reduced instance still contains what greedy itself would
+consider first, not an arbitrary subset that could favor one solver over
+the other.
+
+**The MILP formulation is exact, not a linearized approximation of max-
+coverage.** For each (population point, candidate) influence pair, a
+binary "achiever" variable ties to the candidate's selection variable
+(`z[p,i] <= x_i`) with at most one achiever per point
+(`Σ_i z[p,i] <= 1`); because every objective coefficient is
+non-negative, the solver is *incentivized* to make the achiever the
+single highest-ΔT active candidate at each point — exactly reproducing
+`CoverageObjective.value()` at the optimum, with no big-M relaxation.
+Verified directly: `engine/tests/test_exact.py` confirms the MILP's
+reported objective matches real brute-force enumeration on small
+instances, and matches an independent recomputation via
+`CoverageObjective.value()` on the exact solver's own selected set.
+
+**Measured on the real candidate universe, at the plan's own reduced-
+instance size (300 candidates):**
+
+| Budget | Greedy | Exact (proven optimal) | Ratio | Solve time |
+|---|---|---|---|---|
+| $20,000 | 57,064 | 57,317 | **99.6%** | 1.8s |
+| $100,000 | 223,844 | 224,101 | **99.9%** | 1.1s |
+
+CELF greedy reaches 99.6-99.9% of the *proven* exact optimum on this
+neighborhood's real data — far above both the plan's cited 0.63 figure
+and the knapsack-correct 0.393 worst-case bound (`docs/adr/0012-*.md`).
+Worst-case guarantees describe adversarial instances; this real
+instance's overlap structure is evidently far more favorable to greedy
+than the worst case, which is itself worth stating plainly rather than
+implying the worst-case bound is what was measured.
+
 ### Deferred to a later iteration of Phase 6
 
-- **CP-SAT/HiGHS exact solve** on a reduced instance, to measure the
-  real greedy-vs-exact ratio at scale (currently only measured on small
-  brute-forceable synthetic instances).
 - **Local search improvement pass** (E2's third solver).
 - **Constraints** (E3): maintenance-cost cap, minimum spend per block
   group, max sites per block, public-land-only mode, species diversity,

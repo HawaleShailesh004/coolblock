@@ -62,6 +62,16 @@ the two). Restating the plan's cardinality-case figure without this
 caveat would have been a real, avoidable inaccuracy in a project whose
 explicit posture is "every coefficient is stored with its source."
 
+**4. The exact MILP solver's formulation is exact, not a linearized
+approximation.** `engine/optimize/exact.py` uses per-(population point,
+candidate) binary "achiever" variables (`z[p,i] <= x_i`, at most one
+achiever per point) rather than a big-M relaxation of the max. Because
+every objective coefficient is non-negative, the solver is incentivized
+to pick the true highest-ΔT active candidate as each point's achiever,
+exactly reproducing `CoverageObjective.value()` at the optimum. Verified
+against real brute-force enumeration on small instances
+(`engine/tests/test_exact.py`).
+
 ## Consequences
 
 - The Phase 6 DoD's literal property-test bar ("greedy >= 0.63 x exact on
@@ -82,5 +92,12 @@ explicit posture is "every coefficient is stored with its source."
   population points): `build_coverage_objective` takes under 1 second;
   `solve()` takes 0.05-0.2 seconds across budgets from $5,000 to $5
   million -- well inside the Phase 6 DoD's "< 8s for the full
-  neighborhood" bar, with room to spare for the exact/local-search passes
-  still to come.
+  neighborhood" bar, with room to spare for the local-search pass still
+  to come.
+- Measured on a real 300-candidate reduced instance (the plan's own
+  specified size): greedy reaches 99.6-99.9% of HiGHS's *proven* exact
+  optimum, solved in 1-2 seconds. This is far above both the plan's cited
+  cardinality-case figure and the knapsack-correct worst-case bound --
+  worth stating as "measured, not the worst case" in the writeup, per
+  `docs/METHODOLOGY.md`'s optimizer section, rather than implied to be a
+  guaranteed result.

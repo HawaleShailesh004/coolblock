@@ -66,6 +66,15 @@ strict = true
 ignore_missing_imports = true
 exclude = ["^notebooks/", "^data/"]
 
+# highspy (Phase 6's exact MILP solver) is a C-extension binding with no
+# complete type stubs -- calling its functions reads as "untyped call" in
+# strict mode. `disallow_untyped_calls` is scoped to the *caller's*
+# module, not the callee's, so this narrowly exempts only the one module
+# that calls into highspy, not a blanket relaxation.
+[[tool.mypy.overrides]]
+module = "engine.optimize.exact"
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 testpaths = ["engine/tests", "apps/api/tests"]
 addopts = "-ra -q"
