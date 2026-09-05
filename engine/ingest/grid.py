@@ -71,6 +71,34 @@ def get_canonical_grid() -> CanonicalGrid:
     return _canonical_grid(load_neighborhood_config())
 
 
+def get_grid_at_resolution(resolution_m: float) -> CanonicalGrid:
+    """A grid at a coarser resolution that exactly nests the canonical grid
+    (COOLBLOCK-BUILD-PLAN.md §6.1 A2: TsHARP fits at 30m, predicts at 10m).
+
+    `resolution_m` must be an integer multiple of the base resolution --
+    the origin is snapped to a multiple of `resolution_m` itself (not just
+    the base grid's origin), so every coarse pixel covers exactly
+    `(resolution_m / base_resolution)**2` base pixels with no partial
+    overlap at the edges.
+    """
+    base = get_canonical_grid()
+    if resolution_m == base.resolution_m:
+        return base
+    if resolution_m % base.resolution_m != 0:
+        raise ValueError(
+            f"{resolution_m}m must be an integer multiple of the base {base.resolution_m}m grid"
+        )
+
+    minx, miny, maxx, maxy = base.bounds
+    origin_x = math.floor(minx / resolution_m) * resolution_m
+    origin_y = math.ceil(maxy / resolution_m) * resolution_m
+    width = math.ceil((maxx - origin_x) / resolution_m)
+    height = math.ceil((origin_y - miny) / resolution_m)
+
+    transform = Affine(resolution_m, 0.0, origin_x, 0.0, -resolution_m, origin_y)
+    return CanonicalGrid(epsg=base.epsg, resolution_m=resolution_m, transform=transform, width=width, height=height)
+
+
 def clip_to_canonical_grid(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Clip a GeoDataFrame (already in the canonical CRS) to the grid bounds.
 

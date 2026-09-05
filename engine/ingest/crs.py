@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     import geopandas as gpd
     import xarray as xr
 
+    from engine.ingest.grid import CanonicalGrid
+
 
 def to_canonical_crs_vector(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     if gdf.crs is None:
@@ -30,15 +32,17 @@ def to_canonical_crs_vector(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def to_canonical_crs_raster(
-    da: xr.DataArray, *, resampling: str = "bilinear"
+    da: xr.DataArray, *, resampling: str = "bilinear", grid: CanonicalGrid | None = None
 ) -> xr.DataArray:
-    """Reproject onto the canonical grid (engine.ingest.grid) with an explicit,
-    named resampling method -- see COOLBLOCK-BUILD-PLAN.md §5.1.4."""
+    """Reproject onto a canonical grid (engine.ingest.grid) with an explicit,
+    named resampling method -- see COOLBLOCK-BUILD-PLAN.md §5.1.4. Defaults
+    to the 10m grid; pass `grid=get_grid_at_resolution(30)` etc. for a
+    coarser nested grid (§6.1 A2's 30m fitting resolution)."""
     from rasterio.enums import Resampling
 
     from engine.ingest.grid import get_canonical_grid
 
-    grid = get_canonical_grid()
+    grid = grid or get_canonical_grid()
     reprojected = da.rio.reproject(
         f"EPSG:{grid.epsg}",
         transform=grid.transform,

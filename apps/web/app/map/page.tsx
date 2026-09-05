@@ -17,10 +17,22 @@ const NEIGHBORHOOD = { name: "Edison-Eastlake", city: "Phoenix", state: "AZ" };
 
 const PMTILES_URL =
   process.env.NEXT_PUBLIC_PMTILES_URL ?? "http://localhost:9000/coolblock-tiles/basemap.pmtiles";
+const TITILER_URL = process.env.NEXT_PUBLIC_TITILER_URL ?? "http://localhost:8090";
+const HEAT_SURFACE_COG_URL = "s3://coolblock-data/heat_surface_lst.tif";
+
+// Not a deck.gl layer (see packages/map/src/heatSurface.ts) so it isn't part
+// of DEFAULT_LAYERS, but it shares the same toggle UI and visibility map.
+const HEAT_SURFACE_TOGGLE = {
+  id: "heat-surface",
+  label: "Heat surface (modeled -- see methodology)",
+  defaultVisible: true,
+};
 
 export default function MapPage() {
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(DEFAULT_LAYERS.map((l) => [l.id, l.defaultVisible])),
+    Object.fromEntries(
+      [...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE].map((l) => [l.id, l.defaultVisible]),
+    ),
   );
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<SelectedFeature | null>(null);
@@ -28,7 +40,7 @@ export default function MapPage() {
 
   const commands: Command[] = useMemo(
     () => [
-      ...DEFAULT_LAYERS.map((l) => ({
+      ...[...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE].map((l) => ({
         id: `toggle-${l.id}`,
         label: `${visibility[l.id] ? "Hide" : "Show"} layer: ${l.label}`,
         run: () => setVisibility((v) => ({ ...v, [l.id]: !v[l.id] })),
@@ -71,13 +83,19 @@ export default function MapPage() {
     >
       <TopBar onOpenPalette={() => setOpen(true)} copyStatus={copyStatus} />
       <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 280px", overflow: "hidden" }}>
-        <InspectorRail layers={DEFAULT_LAYERS} visibility={visibility} onChange={setVisibility} counts={counts} />
+        <InspectorRail
+          layers={[...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE]}
+          visibility={visibility}
+          onChange={setVisibility}
+          counts={counts}
+        />
         <CoolBlockMap
           pmtilesUrl={PMTILES_URL}
           layers={DEFAULT_LAYERS}
           visibility={visibility}
           onDataLoaded={setCounts}
           onFeatureClick={setSelected}
+          heatSurface={{ titilerBaseUrl: TITILER_URL, cogUrl: HEAT_SURFACE_COG_URL }}
         />
         <ContextPanel selected={selected} />
       </div>
@@ -128,13 +146,19 @@ function TopBar({ onOpenPalette, copyStatus }: { onOpenPalette: () => void; copy
   );
 }
 
+interface LayerToggle {
+  id: string;
+  label: string;
+  defaultVisible: boolean;
+}
+
 function InspectorRail({
   layers,
   visibility,
   onChange,
   counts,
 }: {
-  layers: typeof DEFAULT_LAYERS;
+  layers: LayerToggle[];
   visibility: Record<string, boolean>;
   onChange: (v: Record<string, boolean>) => void;
   counts: Record<string, number>;

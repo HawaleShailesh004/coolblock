@@ -29,6 +29,7 @@ dependencies = [
     "osm2geojson>=0.3.2",
     "h5netcdf>=1.8.1",
     "duckdb>=1.5.5",
+    "rio-cogeo>=7.0.2",
 ]
 
 [project.optional-dependencies]

@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_PMTILES_URL: process.env.NEXT_PUBLIC_PMTILES_URL,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_TITILER_URL: process.env.TITILER_URL,
   },
 };
 
