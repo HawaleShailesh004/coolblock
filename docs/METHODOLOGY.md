@@ -493,6 +493,17 @@ from about −20,993 to +10,945. Any UI or report copy must describe this
 number as cooling weighted by *relative* vulnerability, not as "degrees
 of cooling delivered" on its own.
 
+**Confidence bounds** (`ewcb_low`/`ewcb_high`), satisfying the Phase 5 DoD
+requirement that "every candidate carries... an EWCB with confidence
+[bounds]": for canopy candidates, C1's own `beta_ci95` is propagated
+linearly through the EWCB calculation (`ewcb_person_degree_hours` is
+linear in β), giving an exact confidence band from C1's real regression
+uncertainty — not a separately fitted or invented uncertainty model.
+`cool_roof`, `cool_pavement`, and `shade_structure` have no fitted
+uncertainty source this phase (C3's energy-balance model reports a point
+estimate only), so their bounds equal the point estimate exactly — a
+disclosed gap, not a fabricated band.
+
 ## Sections (filled in as later phases land)
 
 - **The optimizer** (Phase 6) — why this is submodular maximization under a

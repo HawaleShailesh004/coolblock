@@ -76,7 +76,11 @@ import pandas as pd
 from engine.equity.exposure import compute_exposure_multiplier
 from engine.equity.hvi import compute_hvi
 from engine.equity.population import redistribute_population
-from engine.impact.cooling_kernel import CANOPY_INTERVENTION_TYPES, SIGMA_M
+from engine.impact.cooling_kernel import (
+    CANOPY_INTERVENTION_TYPES,
+    SIGMA_M,
+    CoolingKernelCalibration,
+)
 
 DESIGN_DAY_HOURS = 10.0  # matches engine.impact.shade's 09:00-18:00 window
 
@@ -99,7 +103,14 @@ def load_population_points() -> gpd.GeoDataFrame:
     return joined
 
 
-def _ewcb_canopy(candidates: gpd.GeoDataFrame, population: gpd.GeoDataFrame) -> np.ndarray[Any, np.dtype[np.float64]]:
+def _ewcb_canopy(
+    candidates: gpd.GeoDataFrame, population: gpd.GeoDataFrame, beta_scale: float = 1.0
+) -> np.ndarray[Any, np.dtype[np.float64]]:
+    """`beta_scale` rescales `delta_t_peak_degc` -- since that column is
+    itself `beta_magnitude * (other factors)` (`engine.impact.cooling_kernel`),
+    multiplying by `ci_bound / beta_magnitude` propagates C1's beta
+    confidence interval through to an EWCB confidence bound linearly,
+    without re-deriving the whole per-candidate calculation."""
     radius_m = INFLUENCE_RADIUS_SIGMA_MULTIPLES * SIGMA_M
     sindex = population.sindex
     pop_centroids = population.geometry.centroid
@@ -114,7 +125,7 @@ def _ewcb_canopy(candidates: gpd.GeoDataFrame, population: gpd.GeoDataFrame) -> 
         nearby_centroids = pop_centroids.iloc[nearby_idx]
 
         d2 = nearby_centroids.distance(center).to_numpy() ** 2
-        delta_t = row.delta_t_peak_degc * np.exp(-d2 / (2 * SIGMA_M**2))
+        delta_t = (beta_scale * row.delta_t_peak_degc) * np.exp(-d2 / (2 * SIGMA_M**2))
 
         result[i] = float(
             np.sum(delta_t * nearby["hvi"].to_numpy() * nearby["exposure"].to_numpy() * nearby["population"].to_numpy())
@@ -139,23 +150,62 @@ def _ewcb_cool_roof(candidates: gpd.GeoDataFrame, population: gpd.GeoDataFrame) 
     return result
 
 
-def compute_ewcb(candidates: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def compute_ewcb(
+    candidates: gpd.GeoDataFrame,
+    cooling_calibration: CoolingKernelCalibration | None = None,
+) -> gpd.GeoDataFrame:
     """Adds `ewcb_person_degree_hours` to `candidates`. Requires
     `delta_t_peak_degc` (from `cooling_kernel.run_cooling_kernel`) for
     canopy candidates and/or `delta_t_degc` (from `albedo.run_albedo_model`)
     for `cool_roof` candidates already present -- whichever column is
-    missing, that intervention type's rows score 0.0 rather than raising."""
+    missing, that intervention type's rows score 0.0 rather than raising.
+
+    Passing the `CoolingKernelCalibration` C1 already produces (its own
+    `beta_ci95`) also fills `ewcb_low`/`ewcb_high` for canopy candidates --
+    the plan's DoD requirement (§6.3/§6.4) that "every candidate carries...
+    an EWCB with confidence [bounds]." Linear in beta (see `_ewcb_canopy`),
+    so this is an exact propagation of C1's own regression uncertainty, not
+    a separately fitted or invented uncertainty model. `cool_roof`,
+    `cool_pavement`, and `shade_structure` have no fitted uncertainty
+    source in this phase (C3's energy-balance model reports a point
+    estimate only) -- their `ewcb_low`/`ewcb_high` stay equal to the point
+    estimate, disclosed here and in `docs/METHODOLOGY.md` rather than
+    fabricating a band."""
     population = load_population_points()
     ewcb = pd.Series(0.0, index=candidates.index)
+    ewcb_low = pd.Series(0.0, index=candidates.index)
+    ewcb_high = pd.Series(0.0, index=candidates.index)
 
     canopy_mask = candidates["intervention_type"].isin(CANOPY_INTERVENTION_TYPES)
     if canopy_mask.any() and "delta_t_peak_degc" in candidates.columns:
-        ewcb.loc[canopy_mask] = _ewcb_canopy(candidates[canopy_mask], population)
+        canopy_candidates = candidates[canopy_mask]
+        ewcb.loc[canopy_mask] = _ewcb_canopy(canopy_candidates, population)
+
+        if cooling_calibration is not None:
+            beta_magnitude = abs(cooling_calibration.beta_degc_per_canopy_fraction)
+            ci_low, ci_high = cooling_calibration.beta_ci95
+            scale_low, scale_high = abs(ci_low) / beta_magnitude, abs(ci_high) / beta_magnitude
+            bound_a = _ewcb_canopy(canopy_candidates, population, beta_scale=scale_low)
+            bound_b = _ewcb_canopy(canopy_candidates, population, beta_scale=scale_high)
+            ewcb_low.loc[canopy_mask] = np.minimum(bound_a, bound_b)
+            ewcb_high.loc[canopy_mask] = np.maximum(bound_a, bound_b)
+        else:
+            ewcb_low.loc[canopy_mask] = ewcb.loc[canopy_mask]
+            ewcb_high.loc[canopy_mask] = ewcb.loc[canopy_mask]
 
     cool_roof_mask = candidates["intervention_type"] == "cool_roof"
     if cool_roof_mask.any() and "delta_t_degc" in candidates.columns:
         ewcb.loc[cool_roof_mask] = _ewcb_cool_roof(candidates[cool_roof_mask], population)
 
+    # No fitted uncertainty source for cool_roof/cool_pavement/shade_structure
+    # this phase -- their low/high bounds equal the point estimate, not a
+    # fabricated band (see docstring above).
+    unbounded_mask = ~canopy_mask
+    ewcb_low.loc[unbounded_mask] = ewcb.loc[unbounded_mask]
+    ewcb_high.loc[unbounded_mask] = ewcb.loc[unbounded_mask]
+
     out = candidates.copy()
     out["ewcb_person_degree_hours"] = ewcb
+    out["ewcb_low"] = ewcb_low
+    out["ewcb_high"] = ewcb_high
     return out
