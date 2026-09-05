@@ -12,6 +12,7 @@
     "clean": "rm -rf .next .turbo"
   },
   "dependencies": {
+    "@coolblock/map": "workspace:*",
     "@coolblock/schema": "workspace:*",
     "@coolblock/ui": "workspace:*",
     "next": "15.1.0",

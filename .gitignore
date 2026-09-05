@@ -52,3 +52,6 @@ secrets.*
 
 # --- Docker ---
 .minio/
+
+# --- Browser automation artifacts ---
+.playwright-mcp/

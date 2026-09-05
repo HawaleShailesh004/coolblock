@@ -1,3 +1,3 @@
-// Phase 0: tokens only. Primitives (<Slider>, <ScrubBar>, <SwipeDivider>,
+// Phase 0/2: tokens only. Primitives (<Slider>, <ScrubBar>, <SwipeDivider>,
 // <SitePin>, <StatTile>, <StreamLog>) land in Phase 8 (§8.5).
-export {};
+export { colorTokens } from "./tokens";

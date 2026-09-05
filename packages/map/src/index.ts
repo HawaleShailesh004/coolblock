@@ -1,3 +1,14 @@
-// MapLibre + deck.gl MapboxOverlay wrapper, PMTiles basemap, and the layer-registry
-// architecture (§8.5, §4). Built in Phase 2 -- "the map, first light".
-export {};
+export { CoolBlockMap } from "./CoolBlockMap";
+export type { CoolBlockMapProps, SelectedFeature } from "./CoolBlockMap";
+export { buildBasemapStyle } from "./basemapStyle";
+export { registerPmtilesProtocol } from "./pmtiles";
+export {
+  DEFAULT_VIEW_STATE,
+  parseViewStateFromSearch,
+  readViewStateFromUrl,
+  viewStateToSearchParam,
+  writeViewStateToUrl,
+} from "./viewState";
+export type { MapViewState } from "./viewState";
+export { DEFAULT_LAYERS, buildingsLayer, createLayerRegistry, parcelsLayer, roadsLayer } from "./layers";
+export type { LayerRegistration } from "./layers";

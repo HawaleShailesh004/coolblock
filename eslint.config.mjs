@@ -1,12 +1,17 @@
 // Shared flat config for packages/* (non-Next TS packages). apps/web carries
 // its own Next-specific config (apps/web/eslint.config.mjs).
 import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    plugins: { "react-hooks": reactHooks },
+    rules: reactHooks.configs.recommended.rules,
+  },
   {
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },

@@ -15,15 +15,16 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 1 — Data foundry: complete.** Phase 0 (monorepo, local dev stack,
-design tokens, CI) is done. All 16 data-contract sources are accounted for
-— 15 live via `engine/ingest/` (`make ingest`), one (D5) deliberately
-superseded by another source, documented in
-[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md). The CRS invariant test is
-green, the canonical 10 m grid is defined once, and
-[`notebooks/00-phase1-data-check.ipynb`](notebooks/00-phase1-data-check.ipynb)
-renders every layer stacked over the neighborhood, aligned. The thermal
-surface, plantable-space model, optimizer, and product UI (Phases 2-9) are
+**Phase 2 — The map, first light: complete.** Phases 0 (foundations) and 1
+(data foundry — all 16 data-contract sources, see
+[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)) are done. The real
+Edison-Eastlake neighborhood renders in 3D at `/map`: a self-hosted
+Protomaps basemap (`scripts/build_basemap.sh`), 2,844 real buildings
+extruded (measured height where OSM has it, a disclosed estimate
+otherwise — see `docs/adr/0003-*.md`), 2,734 roads, 2,956 parcels, a
+layer-registry architecture for Phase 4+ layers to plug into, a working
+command palette (⌘K), click-to-inspect, and URL-shareable camera state.
+The thermal surface, plantable-space model, and optimizer (Phases 3-9) are
 next — see the plan's 16 phases.
 
 ## Quickstart
@@ -41,6 +42,8 @@ Cloudflare R2), and TiTiler via Docker Compose, installs JS and Python
 dependencies, and starts the Next.js app + FastAPI dev servers.
 
 - Web: http://localhost:3000
+- Map: http://localhost:3000/map (first run: `uv run python scripts/export_map_layers.py`
+  and `bash scripts/build_basemap.sh` to populate `data/derived/edison-eastlake/`)
 - API: http://localhost:8000/health
 - MinIO console: http://localhost:9001
 
