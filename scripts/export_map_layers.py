@@ -21,59 +21,10 @@ import geopandas as gpd
 from engine.ingest import d04_osm, d06_parcels
 from engine.ingest.manifest import version_dir
 from engine.surface.candidates import generate_candidates
+from engine.surface.heights import estimate_height_m as _estimate_height_m
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO_ROOT / "data" / "derived" / "edison-eastlake"
-
-METRES_PER_LEVEL = 3.5
-ROOF_ALLOWANCE_M = 1.0
-# Fallback height by OSM `building` tag value, for the ~97% of buildings
-# with no height/levels tag at all. Rough, disclosed, and labeled as
-# estimated wherever it's rendered -- not presented as measured.
-DEFAULT_HEIGHT_BY_TYPE = {
-    "house": 5.0,
-    "residential": 5.0,
-    "detached": 5.0,
-    "terrace": 6.0,
-    "apartments": 12.0,
-    "commercial": 8.0,
-    "retail": 7.0,
-    "industrial": 8.0,
-    "university": 10.0,
-    "school": 8.0,
-    "church": 12.0,
-    "garage": 3.0,
-    "carport": 3.0,
-    "shed": 3.0,
-    "roof": 3.0,
-    "service": 4.0,
-}
-DEFAULT_HEIGHT_M = 5.0
-
-
-def _parse_height_tag(value: object) -> float | None:
-    if value is None or (isinstance(value, float) and value != value):  # NaN
-        return None
-    s = str(value).strip().lower().replace("m", "").strip()
-    try:
-        return float(s)
-    except ValueError:
-        return None
-
-
-def _estimate_height_m(row: gpd.GeoSeries) -> tuple[float, str]:
-    """Returns (height_m, provenance) -- provenance is surfaced to the UI,
-    never silently blended with measured values."""
-    height = _parse_height_tag(row.get("height"))
-    if height is not None and height > 0:
-        return height, "measured"
-
-    levels = _parse_height_tag(row.get("building:levels"))
-    if levels is not None and levels > 0:
-        return levels * METRES_PER_LEVEL + ROOF_ALLOWANCE_M, "levels"
-
-    building_type = str(row.get("building") or "").lower()
-    return DEFAULT_HEIGHT_BY_TYPE.get(building_type, DEFAULT_HEIGHT_M), "estimated_default"
 
 
 def export_buildings() -> Path:

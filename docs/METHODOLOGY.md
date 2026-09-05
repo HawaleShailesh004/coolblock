@@ -125,14 +125,106 @@ different source polygon set (Phase 5/6 follow-up).
 **Error rate: 2/30 = 6.7%**, attributable to open-data completeness, not
 the rule layer's logic. Disclosed rather than chased indefinitely.
 
+## Equity weighting (Phase 5)
+
+Two composites feed the equity side of scoring: who lives where
+(population), and how vulnerable they are to heat (HVI). Both are computed
+at Census block-group level — the granularity D7 (ACS5) is published at,
+and the level D7b's real block-group polygons (see below) support.
+
+### D1 — dasymetric population redistribution
+
+`engine/equity/population.py` redistributes each block group's ACS total
+population onto its residential building footprints, weighted by
+footprint area × estimated floor count, rather than treating population as
+uniform across the block group polygon (the standard "dasymetric" fix for
+the modifiable-areal-unit problem).
+
+Real block-group *boundaries* come from **D7b** (Census TIGER/Line 2022),
+a source added this phase, not one of the original 16 in the data
+contract. The only other block-group polygon set already cached (D10, Tree
+Equity Score, 2020 vintage) only matched 9 of D7's 23 block groups — Census
+periodically redraws block-group boundaries, and TES/ACS don't share a
+vintage. D7b is keyless REST, direct from Census, clipped to the same
+locked bbox as every other source.
+
+Floor counts reuse the same building-height model as the map's 3D
+extrusion (`engine/surface/heights.py`, shared rather than duplicated):
+the OSM `building:levels` tag when present, otherwise height ÷ 3.5m/level
+derived from the same OSM `height` tag or per-type default used for
+rendering.
+
+**Disclosed judgment call:** OSM's generic `building=yes` tag (1,155 of
+2,844 buildings in this bbox — the largest single bucket) doesn't
+distinguish residential from other use. Edison-Eastlake is overwhelmingly
+residential (verified visually against NAIP imagery during Phase 4's
+spot-check), so `yes` defaults to residential rather than being dropped —
+dropping it would undercount the housing stock by nearly half. Two real
+misclassifications this caused were caught and fixed during development
+(see the module docstring in `engine/equity/population.py` for the exact
+cases — a hospital oncology clinic and a park pavilion, both `yes`-tagged
+with no residential signal): any `yes`-tagged building carrying a
+non-residential secondary tag (`amenity`, `healthcare`, `shop`, `office`,
+`tourism`, `leisure`, `religion`) or a `name` is excluded, since actual
+dwellings are essentially never individually named in OSM.
+
+**Disclosed limitation, capped rather than hidden:** in a block group
+where only one or two buildings end up classified residential (a
+university/stadium district near Chase Field has exactly this shape),
+that lone building would otherwise absorb its block group's *entire* ACS
+population — thousands of people in a single small structure, which is
+physically impossible. `MAX_PERSONS_PER_M2_FLOOR_AREA` (a dense-apartment
+rate, 1 person per 15 m² of total floor area) caps per-building density;
+population a block group's identified buildings can't plausibly hold is
+tracked per block group by `summarize_unallocated_population()` rather
+than silently dropped or overstated onto a building. Across all 23 block
+groups, roughly a third of the neighborhood's ACS population (13,253 of
+25,953 allocated) currently lands in this unallocated bucket — a real
+finding about OSM residential-building under-coverage in this
+neighborhood, not a modeling artifact, and it is surfaced rather than
+smoothed away.
+
+### D2 — Heat Vulnerability Index (HVI)
+
+`engine/equity/hvi.py` computes, per block group:
+
+    HVI = mean( z(SVI), z(%age65+), z(%age<5), z(asthma+CHD prevalence),
+                z(%renter), z(%no-vehicle) )
+
+Weights default to equal (`DEFAULT_WEIGHTS`) but are a parameter, not a
+hardcoded formula — a planner can and should argue with them, and
+`compute_hvi(weights=...)` makes re-weighting a function call. A
+sensitivity check (`engine/tests/test_equity_hvi.py::test_hvi_sensitivity_to_weights`)
+confirms that an SVI-only weighting produces a genuinely different block
+group ranking from the equal weighting, not just a rescaled copy of it.
+
+**Disclosed adaptations:**
+
+1. **No AC-access indicator.** No such data source exists in the current
+   data contract, and none is ingested to fake one — HVI here is the mean
+   of six available z-scores, not the seven the plan's formula lists.
+2. **Tract-to-block-group broadcast.** SVI (D8) and PLACES (D9, asthma/CHD
+   prevalence) are published at Census *tract* level; each tract's value
+   is broadcast to its constituent block groups, the same approach already
+   used for D7's own tract-level poverty/vehicle fields.
+3. **Relative, not absolute, vulnerability.** Z-scores are computed
+   *within this neighborhood's 23 block groups*, not against a citywide or
+   national reference population (which would require ingesting every
+   Maricopa County block group — out of scope for a single-neighborhood
+   tool). HVI here ranks Edison-Eastlake block groups against each other,
+   not against the region. Any UI or report copy referencing HVI must
+   describe it as relative vulnerability within the neighborhood.
+
+Validated against real data: HVI ranges from −0.86 to +1.35 across the 23
+block groups, and correctly surfaces the block group with the highest raw
+SVI (0.98) as its highest-HVI block group.
+
 ## Sections (filled in as later phases land)
 
 - **Cooling impact** (Phase 5) — the cooling kernel, its calibration on
   local LST-vs-canopy data, the shade raytrace method, the albedo model and
   its Wolfram unit check (or the fallback noted in `docs/adr/0002-*.md` if
   Wolfram access isn't available yet).
-- **Equity weighting** (Phase 5) — the HVI composite, its default weights,
-  the sensitivity analysis.
 - **The optimizer** (Phase 6) — why this is submodular maximization under a
   knapsack constraint, the three solvers, the measured greedy/exact ratio,
   the baseline comparison and its result.
