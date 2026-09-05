@@ -183,6 +183,71 @@ layer): street trees ΔT_peak ≈ 0.11-0.29°C, tree clusters ≈ 0.07-7.9°C
 (scaling with cluster capacity up to full local canopy saturation), shade
 structures = 0.0°C by construction.
 
+### C2 — shade raytracing
+
+`engine/impact/shade.py` answers the plan's "visual centrepiece" question
+per candidate: how many hours of the design day does its shadow actually
+reach real pedestrian space?
+
+The **design day** is the real hottest day on record in the ingested
+Open-Meteo series (D13, 2021-2025 summers) — **2025-07-09, 46.9°C** — not
+an assumed or literature date. For each hour 09:00-18:00 that day, real
+solar geometry (`pvlib.solarposition`, at the neighborhood centroid) gives
+the sun's azimuth and elevation; midday elevation on that date peaks at
+~77°, consistent with Phoenix's near-tropical July sun angle. Each
+candidate's assumed canopy or structure height/width casts a rectangular
+shadow whose length (`height / tan(elevation)`, capped at 60m) and
+direction (opposite the sun's azimuth) follow directly from that geometry.
+The shadow is intersected against real pedestrian-surface vector data:
+OSM footways/steps/pedestrian ways, bus stops (buffered), playgrounds, and
+school grounds (buffered, standing in for "school routes" — see
+simplification 4 below).
+
+Measured on the real candidate set (1,472 candidates): street trees —
+sited near roads by construction (`engine/surface/candidates.py`) —
+deliver a median of **7 of 10** design-day hours of shade; park-lot tree
+clusters, sited in larger interior lots away from footways, deliver a
+median of **0**; shade structures (sited near bus stops) deliver a median
+of **1.5**. 896 of 1,472 candidates (61%) deliver shade for at least one
+hour. This is a real, disclosed geographic finding, not a modeling
+artifact: candidates.py's own siting logic determines proximity to
+pedestrian infrastructure, and C2 is just measuring the consequence of
+where Phase 4 already put things.
+
+**Disclosed simplifications** (see the module docstring for the full
+reasoning behind each):
+
+1. **No full height-field/DEM occlusion.** This computes each candidate's
+   own shadow reaching nearby pedestrian surfaces directly from solar
+   geometry, without checking whether an intervening building would
+   already block or shade that path first. The plan's literal
+   "GPU-style horizon-angle sweeping on the height raster" (DEM + building
+   heights + existing + proposed canopy) is a natural upgrade — the
+   ingested DEM (D12) and building heights (`engine/surface/heights.py`)
+   are both already available — but was not built this phase.
+2. **One representative crown/structure per candidate, not per planted
+   tree**, matching C1's same simplification.
+3. **Assumed, disclosed dimensions**: a mature street tree at 8m tall,
+   8m crown width (matching the 4m crown-radius proxy already used
+   elsewhere); a shade structure at 3m tall, 3m wide (typical bus-shelter
+   canopy scale). No OSM source carries height/width tags for
+   not-yet-built candidates.
+4. **No "school route" network exists in this bbox's OSM extract** —
+   school *grounds* (buffered) stand in for the plan's "school walking
+   routes," which is narrower than what the plan describes.
+5. **Shadow length is capped at 60m** — near sunrise/sunset a physically
+   correct shadow can stretch hundreds of metres, well past where modeling
+   it as a constant-width rectangle remains a meaningful approximation of
+   a real tree's dappled, foreshortened shadow.
+
+Unlike C1, `shade_structure` candidates *are* scored by C2 (with their own
+height/width) — the split is deliberate: C1 models ambient,
+evapotranspiration/albedo-driven canopy cooling, which a physical
+structure does not provide, while C2 models direct shading, which both
+trees and structures provide by blocking the sun. `docs/adr/0007-*.md`
+disclosed this split when it excluded shade structures from C1; this is
+where their cooling benefit is actually captured.
+
 ## Equity weighting (Phase 5)
 
 Two composites feed the equity side of scoring: who lives where
