@@ -125,6 +125,64 @@ different source polygon set (Phase 5/6 follow-up).
 **Error rate: 2/30 = 6.7%**, attributable to open-data completeness, not
 the rule layer's logic. Disclosed rather than chased indefinitely.
 
+## Cooling impact (Phase 5)
+
+### C1 — the canopy cooling kernel
+
+`engine/impact/cooling_kernel.py` implements the plan's kernel exactly as
+specified in §6.3 C1:
+
+    ΔT_peak = β · f_canopy_increment · g(impervious_fraction) · h(LST_anomaly)
+    ΔT(d)   = ΔT_peak · exp(−d² / 2σ²)          σ = 30 m (literature midpoint, 25-40 m)
+
+**β is calibrated on this neighborhood's own data, not imported from the
+literature** — an OLS regression of the Phase 3 downscaled 10m LST field
+against local existing canopy fraction (the same buffered-OSM-tree-point
+proxy `engine/surface/rule_layer.py` uses for existing canopy, smoothed
+over the same 30m radius the kernel itself projects influence across),
+controlling for % impervious (D11) so the canopy coefficient isn't just
+re-capturing "impervious areas are also tree-sparse."
+
+Measured on real data: **β = −6.95°C per unit canopy-fraction increment**
+(95% CI: [−7.20, −6.71], tight and clearly non-zero) — meaning going from
+0% to 100% canopy coverage within a 30m radius is associated with roughly
+7°C lower surface temperature, consistent in order of magnitude with the
+plan's literature anchors (up to 1.5°C for realistic single-tree/street
+canopy increments, which this model reproduces: a single street tree's
+canopy increment is ~1.8% of the kernel's influence area, yielding
+ΔT_peak ≈ 0.1-0.3°C once g() and h() are applied). **R² = 0.073** — canopy
+alone explains a small share of raw LST variance (LST is driven by many
+factors besides local canopy: albedo, building mass, irrigation, distance
+to bare desert soil), which is disclosed here rather than hidden behind
+the confidence interval on β alone. The coefficient is precise; the model
+is not a complete explanation of temperature.
+
+**Disclosed simplifications:**
+
+1. **No wind/aspect term** (the plan's `w(wind/aspect)`, held at 1.0) — no
+   urban-canyon wind-flow model exists in this project's scope, and
+   Open-Meteo's (D13) single neighborhood-average wind vector has no way
+   to resolve street-canyon channelling at individual-candidate scale.
+   Faking a directional multiplier from one averaged wind reading would be
+   worse than omitting it.
+2. **One Gaussian patch per candidate, not per planted tree.** A
+   `park_lot_tree_cluster` candidate with capacity > 1 scales
+   `f_canopy_increment` rather than placing multiple kernel centers across
+   its polygon — consistent with the plan's own point that overlapping
+   tree benefits are not additive (§6.5 E1).
+3. **`shade_structure` candidates get zero canopy ΔT.** They plant no
+   canopy, so the tree-crown formula would be physically meaningless for
+   them (caught as a real bug during development — see
+   `engine/tests/test_cooling_kernel.py::test_shade_structures_get_no_canopy_delta_t`).
+   Their cooling benefit is a direct shading effect, to be captured by C2
+   (shade-hours delivered to pedestrian space) once implemented, not by
+   this ambient canopy-regression kernel.
+
+Measured candidate output (1,472 real candidates from Phase 4's rule
+layer): street trees ΔT_peak ≈ 0.11-0.29°C, tree clusters ≈ 0.07-7.9°C
+(scaling with cluster capacity up to full local canopy saturation), shade
+structures = 0.0°C by construction.
+
 ## Equity weighting (Phase 5)
 
 Two composites feed the equity side of scoring: who lives where
@@ -221,10 +279,11 @@ SVI (0.98) as its highest-HVI block group.
 
 ## Sections (filled in as later phases land)
 
-- **Cooling impact** (Phase 5) — the cooling kernel, its calibration on
-  local LST-vs-canopy data, the shade raytrace method, the albedo model and
-  its Wolfram unit check (or the fallback noted in `docs/adr/0002-*.md` if
-  Wolfram access isn't available yet).
+- **Shade raytracing (C2)** and **the albedo model (C3)** (Phase 5) — the
+  design-day shadow sweep and shade-hours-to-pedestrian-surfaces metric,
+  and the surface-energy-balance albedo model with its Wolfram unit check
+  (or the fallback noted in `docs/adr/0002-*.md` if Wolfram access isn't
+  available yet). C1 (the canopy cooling kernel) is documented above.
 - **The optimizer** (Phase 6) — why this is submodular maximization under a
   knapsack constraint, the three solvers, the measured greedy/exact ratio,
   the baseline comparison and its result.
