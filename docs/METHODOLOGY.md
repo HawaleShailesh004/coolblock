@@ -504,11 +504,99 @@ uncertainty source this phase (C3's energy-balance model reports a point
 estimate only), so their bounds equal the point estimate exactly — a
 disclosed gap, not a fabricated band.
 
+## The optimizer (Phase 6)
+
+### Why this is genuinely hard
+
+Benefits **overlap** — two trees 8m apart do not deliver double the
+cooling to a resident standing between them. D4's EWCB
+(`engine/impact/ewcb.py`) sums each candidate's benefit independently,
+which is correct for reporting one candidate's own effect but wrong as an
+objective to maximize over a *set*: it would reduce to "sort by score,
+take the top ones under budget," which is exactly what this problem is
+not (COOLBLOCK-BUILD-PLAN.md §6.5 E1).
+
+### E1 — the coverage-function objective
+
+`engine/optimize/objective.py` redefines EWCB as a **weighted coverage
+function** for optimization purposes:
+
+    F(S) = Σ_p  weight(p) · max_{i ∈ S} ΔT_i(x_p)
+
+taking the *max* ΔT any selected candidate delivers to a population
+point, not the sum. Weighted coverage functions are a canonical monotone
+submodular set function — this is the actual mathematical structure
+behind the plan's submodularity claim, not an assertion. Verified
+directly: `engine/tests/test_objective.py` confirms two overlapping
+candidates covering the same point combine to `max(ΔT₁, ΔT₂)`, not
+`ΔT₁ + ΔT₂`, and that a candidate's marginal gain strictly shrinks once
+another candidate already covers the same ground (submodularity's
+diminishing-returns property, checked directly).
+
+**A real conflict with D4 had to be resolved: HVI can be negative.** D2's
+HVI is a signed z-score, and D4 deliberately keeps that sign for
+transparent reporting. A coverage function with a negative-weighted point
+is not monotone, which breaks both CELF's guarantee and the DoD's own
+"benefit monotone in budget" property test. `OPTIMIZER_HVI_FLOOR = 0.0`
+clips HVI at zero for the optimizer's internal objective only — a
+below-average-vulnerability point contributes zero weight, not a penalty.
+D4's own reported numbers are untouched. See `docs/adr/0012-*.md`.
+
+`cool_pavement` and `shade_structure` candidates inherit D4's disclosed
+zero-attribution scope exactly — the optimizer will never select either
+for equity credit under this objective, a real, disclosed consequence of
+D4's scope rather than a new gap.
+
+### E2 — CELF lazy greedy
+
+`engine/optimize/celf.py` implements Cost-Effective Lazy Forward
+selection (Leskovec et al. 2007): a max-heap keyed by each candidate's
+last-known marginal-gain-per-dollar, lazily re-evaluated (a candidate's
+true marginal gain can only fall as the selection grows, never rise, so a
+stale heap entry only needs recomputing when it reaches the top) — close
+to `O(n)` total evaluations rather than `O(n·k)`, which is what keeps this
+solver fast enough to run interactively.
+
+**A correction to the plan's stated approximation ratio.** The plan cites
+"(1 − 1/e) ≈ 0.63" for CELF — exact for *cardinality*-constrained
+submodular maximization, not the **budget** (knapsack) constraint this
+problem actually has, where the correctly-citable worst-case guarantee is
+(1 − 1/√e) ≈ 0.393 (Khuller, Moss, Naor 1999), achieved by taking the
+better of cost-effective greedy and the single best affordable candidate
+alone (both implemented; `solve()` returns whichever wins). Restating the
+plan's figure without this caveat would have been a real, avoidable
+inaccuracy — corrected and recorded in `docs/adr/0012-*.md`.
+
+**What actually matters is measured, not assumed.** The Phase 6 DoD's own
+bar — "greedy ≥ 0.63 × exact on every small instance" — is checked as an
+*empirical* property test against a real brute-force optimum on small
+synthetic instances
+(`engine/tests/test_celf.py::test_greedy_reaches_at_least_063_of_exact_on_small_instances`),
+and it passes. Benefit-monotone-in-budget is checked the same way.
+
+**Measured on the real, full candidate universe** (4,371 candidates,
+2,401 population points): `build_coverage_objective` takes under 1
+second; `solve()` takes 0.05-0.2 seconds across budgets from $5,000 to $5
+million — well inside the DoD's "< 8s for the full neighborhood" bar.
+
+### Deferred to a later iteration of Phase 6
+
+- **CP-SAT/HiGHS exact solve** on a reduced instance, to measure the
+  real greedy-vs-exact ratio at scale (currently only measured on small
+  brute-forceable synthetic instances).
+- **Local search improvement pass** (E2's third solver).
+- **Constraints** (E3): maintenance-cost cap, minimum spend per block
+  group, max sites per block, public-land-only mode, species diversity,
+  water-budget cap, mandatory inclusion/exclusion.
+- **The efficient frontier** (E4): a $5k-$500k budget sweep.
+- **The five baselines and uplift comparison** (E5).
+- **Wolfram `NMaximize` independent cross-check** (§7.2.3) — deferred the
+  same way as every other Wolfram-dependent piece this session
+  (`docs/adr/0002-*.md`).
+- `notebooks/03-optimizer-benchmarks.ipynb`.
+
 ## Sections (filled in as later phases land)
 
-- **The optimizer** (Phase 6) — why this is submodular maximization under a
-  knapsack constraint, the three solvers, the measured greedy/exact ratio,
-  the baseline comparison and its result.
 - **Uncertainty** — how confidence bands are computed and propagated end to
   end, and where they are (and are not) shown in the UI.
 
