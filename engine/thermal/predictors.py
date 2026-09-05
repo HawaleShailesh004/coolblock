@@ -23,6 +23,18 @@ ALBEDO_PROXY_NOTE = (
     "regression purposes, not a validated broadband albedo retrieval."
 )
 
+# Sentinel-2 L2A surface reflectance is delivered as scaled digital numbers
+# (the ESA-standard 1/10000 scale factor), not 0-1 reflectance directly.
+# NDVI/NDBI are band ratios so the scale cancels out and this never
+# mattered for them -- but albedo_proxy is an absolute value, and going
+# out ~unscaled (DN ~1000-9000) was a real, previously-unnoticed bug: it
+# didn't affect the Phase 3 downscaling regression (a gradient-boosted
+# model splits on feature values regardless of their scale) but silently
+# broke Phase 5's albedo energy-balance model (engine/impact/albedo.py),
+# which needs a real 0-1 physical albedo. Caught when every candidate's
+# current_albedo_proxy came back pegged at the model's clip ceiling.
+SENTINEL2_REFLECTANCE_SCALE = 1.0 / 10000.0
+
 
 def load_sentinel2_predictors(grid: CanonicalGrid | None = None) -> xr.Dataset:
     """The most recent cached Sentinel-2 scene's NDVI/NDBI/albedo-proxy,
@@ -33,10 +45,10 @@ def load_sentinel2_predictors(grid: CanonicalGrid | None = None) -> xr.Dataset:
     latest = ds.isel(time=-1)
 
     red, nir, swir, blue = (
-        latest["B04"].astype("float64"),
-        latest["B08"].astype("float64"),
-        latest["B11"].astype("float64"),
-        latest["B02"].astype("float64"),
+        latest["B04"].astype("float64") * SENTINEL2_REFLECTANCE_SCALE,
+        latest["B08"].astype("float64") * SENTINEL2_REFLECTANCE_SCALE,
+        latest["B11"].astype("float64") * SENTINEL2_REFLECTANCE_SCALE,
+        latest["B02"].astype("float64") * SENTINEL2_REFLECTANCE_SCALE,
     )
     ndvi = (nir - red) / (nir + red).where((nir + red) != 0)
     ndbi = (swir - nir) / (swir + nir).where((swir + nir) != 0)

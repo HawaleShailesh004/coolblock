@@ -248,6 +248,78 @@ trees and structures provide by blocking the sun. `docs/adr/0007-*.md`
 disclosed this split when it excluded shade structures from C1; this is
 where their cooling benefit is actually captured.
 
+### C3 — albedo interventions
+
+`engine/impact/albedo.py` scores two new intervention types generated
+this phase (`engine/surface/impervious_candidates.py`) that Phase 4
+deliberately deferred (`docs/adr/0005-*.md`): **cool roof** (over every
+OSM building footprint, 2,842 candidates) and **cool/reflective pavement**
+(over every OSM off-street parking lot, 57 candidates) — the two
+intervention types that target *impervious* surfaces the plantable-space
+rule layer explicitly excludes.
+
+The model is a first-order surface energy-balance perturbation —
+ΔT = Δα·S_down / (h_conv + 4εσT³) — not a full radiative-transfer
+simulation, cross-checked by hand for unit consistency since Wolfram
+access isn't available this session (`docs/adr/0002-*.md`'s documented
+fallback): see the module docstring for the term-by-term check. Every
+input is real or a disclosed literature constant:
+
+- **S_down** (peak solar-noon irradiance): from NASA POWER's (D14) real
+  daily total for the design day, converted via the standard
+  sinusoidal-insolation approximation using real `pvlib`-computed
+  sunrise/sunset — **≈872 W/m²** for 2025-07-09.
+- **h_conv**: McAdams' empirical convection correlation driven by
+  Open-Meteo's (D13) real design-day wind speed — **≈13.7 W/(m²·K)** at
+  2.1 m/s average wind.
+- **Current albedo**: sampled per-candidate from the real Sentinel-2
+  albedo proxy, not assumed uniform.
+- **Target albedo**: literature planning values (0.65 cool roof, 0.40
+  cool pavement) — disclosed as planning estimates for not-yet-installed
+  retrofit products.
+
+**A real bug was caught and fixed while building this**: the existing
+Phase 3 albedo proxy (`engine/thermal/predictors.py`) was an unweighted
+mean of *raw* Sentinel-2 L2A digital numbers (~1,450-8,670), not scaled to
+0-1 reflectance. This never affected the Phase 3 downscaling regression
+(a gradient-boosted model splits on relative feature values regardless of
+scale) but silently broke C3's physical use of the same value — every
+candidate's current albedo clipped to the model's ceiling and every ΔT
+came back zero. Fixed by scaling Sentinel-2 bands by the standard ESA
+1/10000 factor before computing `albedo_proxy` (NDVI/NDBI are ratios, so
+they were never affected). Re-ran the Phase 3 downscaling and validation
+tests after the fix — unchanged, as expected. See
+`engine/tests/test_albedo.py::test_albedo_proxy_is_real_reflectance_not_raw_dn`
+for the regression guard.
+
+Measured on real data (post-fix): cool roofs average **ΔT ≈ 12.9°C** at
+their own footprint; cool pavement averages **ΔT ≈ 3.3°C**. These numbers
+are large next to C1's tree ΔT_peak (0.1-7.9°C) because **they measure a
+different quantity** — C3's ΔT is the retrofit surface's own undiluted
+temperature change at its own footprint, not an area-averaged ambient
+effect the way C1's Gaussian kernel already is. The magnitude matches
+published cool-roof literature for *roof surface* temperature reduction
+(commonly 11-22°C, up to ~28°C) — consistent, not inflated — but this
+distinction must travel with any objective (D4's EWCB) that combines C1
+and C3 contributions; they are not directly interchangeable "degrees of
+cooling" without accounting for it.
+
+**Disclosed limitations:**
+
+1. **No roof-slope/flatness data.** Cool-roof coatings are only
+   cost-effective on flat/low-slope roofs in practice, but OSM carries no
+   roof-shape tag for this bbox — every building becomes a candidate
+   regardless of actual roof geometry, over-inclusive of what a city could
+   realistically act on.
+2. **Depaving-to-bioswale is still not generated** — no ingested source
+   distinguishes excess/removable pavement from functionally necessary
+   pavement (a working parking space, an access lane); guessing that
+   distinction would be worse than omitting the candidate type.
+3. **10m-pixel albedo sampling.** A small parking lot or building
+   footprint's centroid pixel can blend in adjacent, differently-surfaced
+   ground via bilinear resampling — the "before" albedo for small
+   candidates is an approximation, not a footprint-exact measurement.
+
 ## Equity weighting (Phase 5)
 
 Two composites feed the equity side of scoring: who lives where
