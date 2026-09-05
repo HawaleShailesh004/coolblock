@@ -1,0 +1,222 @@
+# Running & testing CoolBlock locally
+
+Everything below has actually been run during Phases 0–4 — this isn't a
+theoretical quickstart, it's the exact sequence used to verify each phase.
+If a step doesn't match what you see, that's a real bug worth reporting,
+not "works on my machine."
+
+## 1. Prerequisites
+
+- Node ≥ 20, [pnpm](https://pnpm.io/) ≥ 9
+- Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/)
+- Docker Desktop (or any Docker daemon) — **must be running** before step 2
+- [Go](https://go.dev/) — only needed once, to build the `go-pmtiles` CLI (basemap extraction)
+
+## 2. One-time setup
+
+```bash
+cp .env.example .env
+pnpm install
+uv sync --all-packages --all-extras
+```
+
+Add a **Census API key** to `.env` (`CENSUS_API_KEY=...`) — free, instant,
+at <https://api.census.gov/data/key_signup.html>. Everything else in
+`.env.example` already has working local defaults.
+
+## 3. Bring up local infra
+
+```bash
+docker compose up -d --wait
+```
+
+This starts Postgres 16 + PostGIS + pgvector, Redis, MinIO (a local
+stand-in for Cloudflare R2), and TiTiler. Verify all four are healthy:
+
+```bash
+docker compose ps
+```
+
+You should see `coolblock-minio`, `coolblock-postgres`, `coolblock-redis`
+all `(healthy)`, and `coolblock-titiler` `Up` (it has no healthcheck
+defined, that's expected).
+
+**If Docker Desktop isn't running**, start it first — on Windows/Mac this
+is a normal application; `docker compose up` will fail with a "pipe not
+found" style error otherwise.
+
+## 4. Run the data pipeline (Phase 1)
+
+This fetches all 16 data-contract sources for Edison-Eastlake, Phoenix
+from live APIs (Planetary Computer, Census, CDC, Maricopa County, Open-Meteo,
+NASA POWER, etc.) and caches them under `data/cache/`. It's idempotent —
+safe to re-run; already-cached sources are skipped.
+
+```bash
+uv run python -m engine.ingest.run_all
+```
+
+First run takes several minutes (real network fetches — Landsat alone
+pulls 63 scenes). A clean re-run (everything already cached) completes in
+under 10 seconds. Check `docs/DATA-SOURCES.md` for what each source gives
+you and its current status.
+
+**Verify it worked:**
+
+```bash
+uv run pytest engine/tests -q
+```
+
+You should see all tests pass (31+ tests, more each phase — currently 44).
+Tests for a source that isn't cached are skipped, not failed, so a partial
+ingest still gives you a green run for what *is* there.
+
+## 5. Run the science pipeline (Phases 3–4)
+
+These compute on top of the Phase 1 cache — no network calls, just local
+ML/geospatial processing. Nothing is pre-baked; every number is computed
+live from what `run_all` fetched.
+
+```bash
+# Phase 3: the heat surface (composite, TsHARP downscaling, validation)
+uv run python -c "from engine.thermal.validate import run_validation; v = run_validation(); print(v.passed, v.reasons)"
+
+# Phase 4: plantable space + candidates
+uv run python -c "from engine.surface.candidates import generate_candidates; print(len(generate_candidates()), 'candidates')"
+```
+
+Or just open the notebooks (see §8) — they run the same code and show the
+actual figures.
+
+## 6. Export data for the map app
+
+Three one-off scripts populate `data/derived/edison-eastlake/` and MinIO.
+Re-run any of them whenever the underlying data changes.
+
+```bash
+# Buildings, roads, parcels, and Phase 4 candidates -> GeoJSON
+uv run python scripts/export_map_layers.py
+
+# The basemap: a ~4MB neighborhood-scoped extract from Protomaps' public
+# build, uploaded to MinIO. Needs go-pmtiles: `go install github.com/protomaps/go-pmtiles@latest`
+bash scripts/build_basemap.sh
+
+# The Phase 3 heat surface as a Cloud-Optimized GeoTIFF, uploaded to MinIO for TiTiler
+uv run python scripts/export_heat_surface.py
+```
+
+## 7. Start the app
+
+```bash
+bash scripts/dev.sh
+```
+
+This starts both the FastAPI server and the Next.js dev server together
+(and stops both on Ctrl-C). If port 8000 is already taken by something
+else on your machine:
+
+```bash
+API_PORT=8001 bash scripts/dev.sh
+```
+
+(and update `NEXT_PUBLIC_API_URL` in `.env` to match, if you're using the
+API directly — the map page doesn't need it yet).
+
+No `make` on Windows? Run the pieces directly instead of `make dev`:
+`docker compose up -d --wait`, then `pnpm install && uv sync --all-packages --all-extras`,
+then `bash scripts/dev.sh` — that's exactly what `make dev` does.
+
+### What to open
+
+| URL | What it is |
+|---|---|
+| <http://localhost:3000> | Marketing homepage (light theme) — mostly a placeholder still |
+| **<http://localhost:3000/map>** | **The actual product.** Everything below is here. |
+| <http://localhost:8000/health> (or 8001) | API health check — confirms the FastAPI backend is up |
+| <http://localhost:9001> | MinIO console (login: `coolblock` / `coolblock123`) — browse uploaded tiles/COGs |
+| <http://localhost:8090/cog/info?url=s3://coolblock-data/heat_surface_lst.tif> | TiTiler serving the heat surface COG directly |
+
+## 8. What to actually check on `/map`
+
+This is the real verification checklist — what "it works" means concretely:
+
+1. **The map loads in 3D** with a dark basemap, tilted camera, real street
+   grid. If it's blank/white, check the browser console — the most common
+   cause is `basemap.pmtiles` not uploaded yet (step 6).
+2. **Left rail, "Layers"** — five toggles, each with a live count next to
+   it once data loads (a few seconds): Roads (2,734), Parcel boundaries
+   (2,956), Plantable space (1,472), Buildings (2,844), Heat surface.
+   - **Buildings**: real 3D extrusion. Click one — the right panel
+     ("Inspector") shows `building_type`, `height_m`, and
+     `height_provenance` (`measured` / `levels` / `estimated_default` —
+     most will be `estimated_default`, that's expected and disclosed).
+   - **Heat surface** (on by default): a glowing inferno-colored raster
+     under the buildings. This is the real, validated (2/3 checks — see
+     `docs/METHODOLOGY.md`) downscaled surface temperature.
+   - **Plantable space** (off by default — toggle it on, turn Heat
+     surface off to see it clearly): the neighborhood should "light up"
+     in cyan/green/orange in the gaps between buildings. Click a colored
+     polygon — the Inspector shows `intervention_type`, `ownership`,
+     `capacity`, `total_cost_usd`.
+3. **Command palette**: press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux).
+   Try "Show layer: ..." / "Hide layer: ..." commands, "Reset camera to
+   default view", and "Copy shareable link to this view" — paste the
+   clipboard content into a new tab and confirm it restores the same
+   camera position.
+4. **Pan/zoom the map**, then reload the page — the camera should return
+   to where you left it (state lives in the URL's `?map=` parameter).
+
+If all four of those work, everything built through Phase 4 is verified
+end to end, not just "the code exists."
+
+## 9. Automated checks
+
+```bash
+# Python: tests, lint, types
+uv run pytest engine/tests -q
+uv run ruff check .
+uv run mypy engine apps/api/src
+
+# JS: lint, types, build
+pnpm turbo run lint typecheck build
+```
+
+All of these are expected to be clean on `main` at all times — if one
+fails after pulling latest, that's a regression, not a "known issue."
+
+## 10. Notebooks (the executed, evidence-carrying checkpoints)
+
+These aren't scratch files — each is committed *with its outputs*, so you
+can read the real numbers and figures without re-running anything:
+
+- `notebooks/00-phase1-data-check.ipynb` — all 16 data sources, aligned
+- `notebooks/01-thermal-validation.ipynb` — the heat surface + the A3 validation gate's actual result
+- `notebooks/02-plantable-space.ipynb` — plantable space + the candidate spot-check
+
+Open with `jupyter lab notebooks/` (or your editor's notebook viewer) to
+read them, or re-execute with:
+
+```bash
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/<name>.ipynb
+```
+
+## Troubleshooting
+
+- **Docker containers "unhealthy" or connection refused on 5432/6379/9000/8090**:
+  Docker Desktop may have stopped (it does on some machines after being
+  idle for hours). Restart Docker Desktop, then `docker compose up -d --wait` again.
+  Data in named volumes (Postgres, MinIO) survives a restart.
+- **`/map` shows buildings/roads but no basemap (solid black/blank)**:
+  `basemap.pmtiles` isn't in MinIO yet — run `bash scripts/build_basemap.sh`.
+- **Heat surface layer doesn't render**: the COG isn't in MinIO or TiTiler
+  can't reach it — run `scripts/export_heat_surface.py`, then check
+  `curl http://localhost:8090/cog/info?url=s3://coolblock-data/heat_surface_lst.tif`
+  returns real bounds/stats, not an error.
+- **A layer's count stays at "..." forever**: its GeoJSON export is
+  missing or stale — re-run `scripts/export_map_layers.py`.
+- **Port 8000 (or 3000) already in use**: something unrelated on your
+  machine owns it. Use `API_PORT=8001 bash scripts/dev.sh` for the API;
+  for the web port, run `pnpm exec next dev -p 3001` directly from `apps/web`.
+- **`uv sync` fails to build `coolblock-engine`**: make sure you're
+  running it from the repo root (not `engine/`) — the root `pyproject.toml`
+  *is* the engine package (see `docs/ARCHITECTURE.md`).

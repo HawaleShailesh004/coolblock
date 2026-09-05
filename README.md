@@ -8,7 +8,8 @@
 Built for NextStep Hacks 2026 — "Earth Forward". Full design and phase plan:
 [`COOLBLOCK-BUILD-PLAN.md`](COOLBLOCK-BUILD-PLAN.md). Architecture notes:
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Decisions:
-[`docs/adr/`](docs/adr/).
+[`docs/adr/`](docs/adr/). **Running it locally and checking that it actually
+works: [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md).**
 
 Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 [`config/neighborhood.toml`](config/neighborhood.toml).
