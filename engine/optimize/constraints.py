@@ -44,6 +44,16 @@ a straightforward (non-lazy) greedy: recomputes every remaining
 candidate's marginal gain each round. Slower than CELF per pick, but
 correct under side constraints, and still fast enough in practice (see
 `docs/METHODOLOGY.md`'s measured timings).
+
+**Phase 7 addition: `ConstrainedResult.picks`.** The live-solve SSE stream
+(`engine.optimize.plan_service`) needs to animate sites landing one at a
+time (§9 ★2) for a constrained solve exactly as it already does for
+CELF's own generator -- not just report the final set. Reuses CELF's own
+`Selection` record type rather than inventing a second one, so both
+solvers hand the API layer the same shape. This is a record of the order
+`commit()` actually ran in and the true marginal gain at that moment
+(recomputed once, cheaply, from each candidate's own influence set) --
+not a re-sort of the final selection by some proxy ordering.
 """
 
 from __future__ import annotations
@@ -53,6 +63,7 @@ from typing import Any
 
 import numpy as np
 
+from engine.optimize.celf import Selection
 from engine.optimize.objective import CoverageObjective
 
 FloatArray = np.ndarray[Any, np.dtype[np.float64]]
@@ -93,6 +104,7 @@ class ConstrainedResult:
     annual_maintenance_usd: float
     zone_spend_usd: dict[Any, float]
     zone_site_counts: dict[Any, int]
+    picks: list[Selection] = field(default_factory=list)
 
 
 def _eligible_mask(
@@ -131,6 +143,8 @@ def constrained_greedy(
     maintenance_spent = 0.0
     zone_spend: dict[Any, float] = {}
     zone_counts: dict[Any, int] = {}
+    picks: list[Selection] = []
+    cumulative_value = 0.0
 
     def zone_of(i: int) -> Any:
         return zone_ids[i] if zone_ids is not None else None
@@ -153,15 +167,26 @@ def constrained_greedy(
         )
 
     def commit(i: int) -> None:
-        nonlocal spent, maintenance_spent
+        nonlocal spent, maintenance_spent, cumulative_value
+        gain = objective.marginal_gain(i, current_max)
         objective.apply(i, current_max)
         selected.add(i)
         spent += costs[i]
+        cumulative_value += gain
         if maintenance_costs is not None:
             maintenance_spent += maintenance_costs[i]
         zone = zone_of(i)
         zone_spend[zone] = zone_spend.get(zone, 0.0) + costs[i]
         zone_counts[zone] = zone_counts.get(zone, 0) + 1
+        picks.append(
+            Selection(
+                candidate_index=i,
+                cost_usd=float(costs[i]),
+                marginal_gain=gain,
+                cumulative_value=cumulative_value,
+                cumulative_cost_usd=spent,
+            )
+        )
 
     # 1. Mandatory inclusions first, in the order given, subject only to
     # eligibility and budget -- a mandatory site the budget can't afford
@@ -222,4 +247,5 @@ def constrained_greedy(
         annual_maintenance_usd=maintenance_spent,
         zone_spend_usd=zone_spend,
         zone_site_counts=zone_counts,
+        picks=picks,
     )

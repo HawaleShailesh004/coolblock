@@ -60,6 +60,16 @@ src = ["engine", "apps/api/src"]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
 ignore = ["E501"]
 
+# FastAPI's own dependency-injection pattern *is* `Depends(...)` as an
+# argument default (see the framework's own docs) -- B008 exists to catch
+# a real footgun (a mutable default evaluated once at def time) that
+# doesn't apply here: `Depends()` returns a lightweight marker FastAPI
+# inspects at request time, never mutated. Scoped to apps/api specifically
+# rather than disabled repo-wide, since `engine/` has no FastAPI routes to
+# use this pattern in the first place.
+[tool.ruff.lint.per-file-ignores]
+"apps/api/src/**" = ["B008"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

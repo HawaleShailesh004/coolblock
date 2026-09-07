@@ -131,3 +131,22 @@ def test_never_exceeds_budget() -> None:
     budget = float(costs.sum()) * 0.3
     result = constrained_greedy(objective, costs, ConstraintConfig(budget_usd=budget))
     assert result.cost_usd <= budget + 1e-6
+
+
+def test_picks_record_true_commit_order_and_are_internally_consistent() -> None:
+    """Phase 7 addition: the SSE live-solve stream needs a constrained
+    solve's picks in the order `commit()` actually ran, with cumulative
+    totals that agree with the final result -- not a re-sort by some
+    other proxy ordering."""
+    objective, costs = _instance()
+    budget = float(costs.sum()) * 0.5
+    result = constrained_greedy(objective, costs, ConstraintConfig(budget_usd=budget))
+
+    assert {p.candidate_index for p in result.picks} == result.selected
+    assert len(result.picks) == len(result.selected)  # no duplicate/dropped picks
+    assert result.picks[-1].cumulative_cost_usd == pytest.approx(result.cost_usd)
+    assert result.picks[-1].cumulative_value == pytest.approx(result.objective_value)
+    # cumulative cost and value are both non-decreasing pick over pick
+    for prev, curr in zip(result.picks, result.picks[1:], strict=False):
+        assert curr.cumulative_cost_usd >= prev.cumulative_cost_usd
+        assert curr.cumulative_value >= prev.cumulative_value - 1e-9

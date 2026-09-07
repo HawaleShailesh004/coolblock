@@ -16,22 +16,35 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 4 — Plantable space: complete.** Phases 0 (foundations), 1 (data
-foundry — all 16 data-contract sources, see
-[`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), 2 (the map, first light),
-and 3 (the heat engine — validated 2/3, honesty rail applied, see
-[`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)) are done. The rule-based
-plantable-space layer (ML fusion deferred, see
-[`docs/adr/0005-*.md`](docs/adr/0005-plantable-space-rule-first.md))
-identifies 1,481 real polygons (301 ha, 52% of the neighborhood) from
-NAIP, OSM buildings/roads/parking/trees, generating **1,472 candidates**
-(street trees, tree clusters, shade structures) with real ownership
-classification. A manual spot-check against aerial imagery found and
-fixed a real gap (untagged parking lots) and disclosed a residual 6.7%
-error rate from OSM data completeness — see
-[`notebooks/02-plantable-space.ipynb`](notebooks/02-plantable-space.ipynb).
-Toggle "Plantable space" at `/map` to see it live. The impact/equity model
-and the optimizer (Phases 5-9) are next — see the plan's 16 phases.
+**Phase 7 — backend product surface: in progress.** Phases 0-6 are done:
+
+- **0-2**: foundations, the data foundry (all 16 sources, see
+  [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), and the map, first light.
+- **3**: the heat engine — TsHARP-downscaled 10m surface temperature,
+  validated 2/3, honesty rail applied (see
+  [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)).
+- **4**: plantable space — rule-based (ML fusion deferred, see
+  [`docs/adr/0005-*.md`](docs/adr/0005-plantable-space-rule-first.md)),
+  1,481 real polygons, 1,472 candidates with ownership classification.
+- **5**: impact & equity — the cooling kernel (C1, locally calibrated),
+  shade raytracing (C2), the albedo model (C3), dasymetric population and
+  the Heat Vulnerability Index (D1/D2), exposure weighting and the
+  Equity-Weighted Cooling Benefit objective (D3/D4).
+- **6**: the optimizer — CELF lazy greedy (E2, the production solver),
+  exact MILP via HiGHS to measure the approximation ratio, a constrained
+  greedy for real side constraints (E3), the efficient frontier (E4), and
+  the five-baseline comparison (E5) — **CoolBlock beats TES-score-only by
+  4.6-14x** on Equity-Weighted Cooling Benefit at equal budget.
+
+**7 (in progress)**: a real FastAPI service — Postgres-backed plans and
+scenario versions, Clerk-shaped auth with a documented local-dev fallback
+(no Clerk tenant provisioned yet, see
+[`docs/adr/0016-*.md`](docs/adr/0016-auth-dev-fallback-and-clerk-integration.md)),
+an ARQ+Redis job queue that runs the real solver and streams its stages
+over SSE with clean reconnect, GeoJSON/CSV export, and public share links —
+see [`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)
+and §8 of [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) for
+how to run and verify it. The frontend wiring (Phase 8) is next.
 
 ## Quickstart
 

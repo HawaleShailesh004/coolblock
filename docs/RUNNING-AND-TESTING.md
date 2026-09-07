@@ -136,7 +136,57 @@ then `bash scripts/dev.sh` — that's exactly what `make dev` does.
 | <http://localhost:9001> | MinIO console (login: `coolblock` / `coolblock123`) — browse uploaded tiles/COGs |
 | <http://localhost:8090/cog/info?url=s3://coolblock-data/heat_surface_lst.tif> | TiTiler serving the heat surface COG directly |
 
-## 8. What to actually check on `/map`
+## 8. The backend: plans, solves, and migrations (Phase 7)
+
+`bash scripts/dev.sh` starts the FastAPI app but not its database schema or
+its job worker — those are one-time/separate steps.
+
+```bash
+# Apply the Postgres schema (workspaces, plans, scenario versions, sites,
+# share links, annotations, audit log) — run once, and again after any
+# migration is added.
+cd apps/api && uv run alembic upgrade head && cd ../..
+
+# Start the ARQ worker that actually runs solves (separate process from
+# the API — the API only enqueues; nothing about a solve blocks a request).
+cd apps/api && uv run arq coolblock_api.jobs.worker.WorkerSettings
+```
+
+No Clerk credentials are provisioned yet (`docs/adr/0016-*.md`), so every
+request needs `X-Dev-User-Id` / `X-Dev-Workspace-Id` (and optionally
+`X-Dev-Role`, default `owner`) headers instead of a real bearer token —
+refused automatically if `ENVIRONMENT=production`. **The Phase 7
+checkpoint, verified**:
+
+```bash
+# Create a plan, kick off a solve, and watch its real pipeline stages
+# stream in over SSE:
+PLAN=$(curl -s -X POST localhost:8000/plans \
+  -H 'Content-Type: application/json' -H 'X-Dev-User-Id: alice' -H 'X-Dev-Workspace-Id: org-a' \
+  -d '{"name":"Demo","budget_usd":50000}')
+PLAN_ID=$(echo "$PLAN" | python -c "import sys,json;print(json.load(sys.stdin)['id'])")
+SOLVE=$(curl -s -X POST "localhost:8000/plans/$PLAN_ID/solve" -H 'X-Dev-User-Id: alice' -H 'X-Dev-Workspace-Id: org-a')
+VERSION=$(echo "$SOLVE" | python -c "import sys,json;print(json.load(sys.stdin)['version_number'])")
+curl -N "localhost:8000/plans/$PLAN_ID/scenarios/$VERSION/events" -H 'X-Dev-User-Id: alice' -H 'X-Dev-Workspace-Id: org-a'
+```
+
+You should see `stage` events (`loading_candidates` → `scoring_impact` →
+`solving`), then a `site` event per selected site in ranked order, then
+one `done` event — the ARQ worker terminal shows the same job being
+picked up and completed. Once done,
+`GET /plans/$PLAN_ID/scenarios/$VERSION` returns the persisted result,
+`.../export.geojson` and `.../export.csv` return the sites, and
+`POST .../share` + `GET /share/{token}` (no auth needed) expose a public
+read-only view.
+
+**Regenerate the frontend's TypeScript API types** after changing any
+router/schema (the API must be running):
+
+```bash
+API_URL=http://localhost:8000 pnpm --filter @coolblock/schema generate
+```
+
+## 9. What to actually check on `/map`
 
 This is the real verification checklist — what "it works" means concretely:
 
@@ -169,11 +219,11 @@ This is the real verification checklist — what "it works" means concretely:
 If all four of those work, everything built through Phase 4 is verified
 end to end, not just "the code exists."
 
-## 9. Automated checks
+## 10. Automated checks
 
 ```bash
 # Python: tests, lint, types
-uv run pytest engine/tests -q
+uv run pytest -q          # engine/tests + apps/api/tests together
 uv run ruff check .
 uv run mypy engine apps/api/src
 
@@ -181,10 +231,18 @@ uv run mypy engine apps/api/src
 pnpm turbo run lint typecheck build
 ```
 
+`apps/api/tests` needs the same Postgres/Redis containers from §3 running
+(it creates its own `coolblock_test` database and uses Redis logical DB 1,
+both on the same containers, so it never touches your `coolblock`
+dev data) — no other setup is required, `apps/api/tests/conftest.py`
+handles it. These tests are skipped, not failed, if
+`data/derived/edison-eastlake/candidates.geojson` hasn't been built yet
+(§6) — the solve/export/share tests need it.
+
 All of these are expected to be clean on `main` at all times — if one
 fails after pulling latest, that's a regression, not a "known issue."
 
-## 10. Notebooks (the executed, evidence-carrying checkpoints)
+## 11. Notebooks (the executed, evidence-carrying checkpoints)
 
 These aren't scratch files — each is committed *with its outputs*, so you
 can read the real numbers and figures without re-running anything:
@@ -202,10 +260,18 @@ uv run jupyter nbconvert --to notebook --execute --inplace notebooks/<name>.ipyn
 
 ## Troubleshooting
 
-- **Docker containers "unhealthy" or connection refused on 5432/6379/9000/8090**:
+- **Docker containers "unhealthy" or connection refused on 5433/6379/9000/8090**:
   Docker Desktop may have stopped (it does on some machines after being
   idle for hours). Restart Docker Desktop, then `docker compose up -d --wait` again.
   Data in named volumes (Postgres, MinIO) survives a restart.
+- **Postgres connection refused/auth fails even though the container is
+  healthy**: check whether something else on your machine is already
+  bound to the port Postgres uses. This project maps the container to
+  host port **5433**, not the default 5432, specifically because some
+  machines have a native Postgres install already listening on 5432 --
+  `docker exec` into the container still works in that case (it bypasses
+  host port forwarding), only host-side connections silently hit the
+  wrong Postgres and fail auth.
 - **`/map` shows buildings/roads but no basemap (solid black/blank)**:
   `basemap.pmtiles` isn't in MinIO yet — run `bash scripts/build_basemap.sh`.
 - **Heat surface layer doesn't render**: the COG isn't in MinIO or TiTiler

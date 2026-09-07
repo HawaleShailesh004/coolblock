@@ -33,7 +33,7 @@ typecheck:
 	pnpm turbo run typecheck
 	uv run mypy .
 
-test:
+test: # needs `make up` running -- apps/api/tests provisions its own coolblock_test DB on the same Postgres container
 	pnpm turbo run test
 	uv run pytest
 
