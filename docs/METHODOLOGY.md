@@ -850,12 +850,25 @@ high-cost-effectiveness candidates (largely `cool_roof`, per the finding
 above) gets exhausted well before $500k, after which additional spend
 buys markedly less. The full 51-point sweep solves in ~2.5 seconds total.
 
-### Deferred to a later iteration of Phase 6
+### Phase 6 status: complete except Wolfram's independent cross-check
 
-- **Wolfram `NMaximize` independent cross-check** (§7.2.3) — deferred the
-  same way as every other Wolfram-dependent piece this session
-  (`docs/adr/0002-*.md`).
-- `notebooks/03-optimizer-benchmarks.ipynb`.
+E1 (submodular coverage objective), E2 (all three solvers -- CELF greedy,
+exact MILP, local search), E3 (five real constraints), E4 (the efficient
+frontier), and E5 (the five baselines) are all built, tested against real
+data, and documented above. The checkpoint notebook
+(`notebooks/03-optimizer-benchmarks.ipynb`) is written and executed with
+real outputs. The map's context panel shows CoolBlock's actual ranked
+plan at a representative budget, verified with a real browser
+click-through (not just a code read).
+
+**Deferred**: Wolfram `NMaximize` independent cross-check (§7.2.3) --
+Wolfram access isn't available this session, deferred the same way as
+every other Wolfram-dependent piece (`docs/adr/0002-*.md`). HiGHS's exact
+MILP solve (E2) already provides one independent verification of greedy's
+quality; Wolfram would be a second, in a different mathematical system,
+per the plan's own reasoning for wanting it ("we did not want to trust
+our own implementation") -- valuable, but not load-bearing for the DoD's
+own greedy-vs-exact ratio requirement, which HiGHS already satisfies.
 
 ## Sections (filled in as later phases land)
 
