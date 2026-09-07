@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
  * data/derived/edison-eastlake/*.geojson; nothing is duplicated into
  * apps/web/public.
  */
-const ALLOWED_LAYERS = new Set(["buildings", "roads", "parcels", "candidates"]);
+const ALLOWED_LAYERS = new Set(["buildings", "roads", "parcels", "candidates", "optimizer_selection"]);
 
 const DERIVED_DIR = path.resolve(process.cwd(), "..", "..", "data", "derived", "edison-eastlake");
 
