@@ -90,7 +90,7 @@ actual figures.
 
 ## 6. Export data for the map app
 
-Three one-off scripts populate `data/derived/edison-eastlake/` and MinIO.
+Four one-off scripts populate `data/derived/edison-eastlake/` and MinIO.
 Re-run any of them whenever the underlying data changes.
 
 ```bash
@@ -101,6 +101,11 @@ uv run python scripts/export_map_layers.py
 # The basemap: a ~4MB neighborhood-scoped extract from Protomaps' public
 # build, uploaded to MinIO. Needs go-pmtiles: `go install github.com/protomaps/go-pmtiles@latest`
 bash scripts/build_basemap.sh
+
+# The basemap's glyphs (labels) + sprite (icons), self-hosted the same
+# way -- without this, labels/icons silently vanish with no internet
+# (docs/adr/0022-*.md's offline-demo-mode fix). No extra tooling needed.
+bash scripts/build_map_assets.sh
 
 # The Phase 3 heat surface as a Cloud-Optimized GeoTIFF, uploaded to MinIO for TiTiler
 uv run python scripts/export_heat_surface.py

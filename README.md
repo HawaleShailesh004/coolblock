@@ -140,6 +140,24 @@ all three SHOULD-tier items (L1, L6, Wolfram verification) are done. L2
 (per-site rationale), L4 (grant packet), and L5 (analyst agent) remain
 explicitly COULD-tier/roadmap-only, not built in this pass.
 
+**Phase 13 (started)**: hardening. First concrete finding: the basemap's
+*tiles* were already self-hosted from local MinIO, but its labels
+(glyphs) and icons (sprite) were still loaded live from
+`protomaps.github.io` — meaning "disconnect the internet and run the
+entire demo" (Phase 13's own checkpoint) would have silently dropped
+every map label and icon, a real, judge-visible gap, not a hypothetical
+one. Fixed:
+[`docs/adr/0022-*.md`](docs/adr/0022-self-hosted-basemap-glyphs-and-sprite.md),
+`scripts/build_map_assets.sh` (a ~620KB one-time download of exactly the
+fontstacks/Unicode ranges this neighborhood's real labels need, matching
+`scripts/build_basemap.sh`'s own established self-hosting pattern). Found
+and fixed a real Windows/Docker bug along the way: a bind-mount with a
+plain Git-Bash POSIX path silently bound to nothing on this machine.
+Phase 13's much larger remaining scope (E2E Playwright suite, golden-file
+tests, error-boundary coverage, security hardening, performance/bundle
+work, cross-browser testing) is untouched — this is one concrete slice,
+not a claim the phase is done.
+
 ## Quickstart
 
 Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/),

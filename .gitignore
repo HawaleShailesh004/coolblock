@@ -55,3 +55,6 @@ secrets.*
 
 # --- Browser automation artifacts ---
 .playwright-mcp/
+
+# --- scripts/build_map_assets.sh's scratch dir (cleaned up on exit; ignored as a defense-in-depth) ---
+.map_assets_tmp/

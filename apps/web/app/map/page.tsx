@@ -23,6 +23,10 @@ const NEIGHBORHOOD = { name: "Edison-Eastlake", city: "Phoenix", state: "AZ" };
 
 const PMTILES_URL =
   process.env.NEXT_PUBLIC_PMTILES_URL ?? "http://localhost:9000/coolblock-tiles/basemap.pmtiles";
+// The basemap's glyphs (labels) and sprite (icons) -- self-hosted via
+// scripts/build_map_assets.sh, not fetched live from protomaps.github.io
+// (docs/adr/0022-*.md's offline-demo-mode fix).
+const MAP_ASSETS_URL = process.env.NEXT_PUBLIC_MAP_ASSETS_URL ?? "http://localhost:9000/coolblock-tiles";
 const TITILER_URL = process.env.NEXT_PUBLIC_TITILER_URL ?? "http://localhost:8090";
 const HEAT_SURFACE_COG_URL = "s3://coolblock-data/heat_surface_lst.tif";
 
@@ -131,6 +135,7 @@ export default function MapPage() {
         />
         <CoolBlockMap
           pmtilesUrl={PMTILES_URL}
+          assetsBaseUrl={MAP_ASSETS_URL}
           layers={DEFAULT_LAYERS}
           visibility={visibility}
           onLayerStatusChange={setLayerStatuses}

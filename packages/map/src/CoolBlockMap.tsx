@@ -33,6 +33,13 @@ const HEAT_LAYER_ID = "heat-surface-layer";
 export interface CoolBlockMapProps {
   /** Absolute or origin-relative URL to the basemap PMTiles archive. */
   pmtilesUrl: string;
+  /**
+   * Base URL for the basemap's self-hosted glyphs/sprite (§13's offline
+   * demo mode, docs/adr/0022-*.md) -- e.g. `http://localhost:9000/coolblock-tiles`,
+   * expected to have `/glyphs/{fontstack}/{range}.pbf` and `/sprites/black*`
+   * underneath it (`scripts/build_map_assets.sh`).
+   */
+  assetsBaseUrl: string;
   /** Registered layers, in z-order (first = bottom). Owned by the caller (§10 Phase 2 registry). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   layers: LayerRegistration<any>[];
@@ -69,6 +76,7 @@ export interface CoolBlockMapProps {
 
 export function CoolBlockMap({
   pmtilesUrl,
+  assetsBaseUrl,
   layers,
   visibility,
   onLayerStatusChange,
@@ -115,7 +123,7 @@ export function CoolBlockMap({
     const initialView = readViewStateFromUrl();
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: buildBasemapStyle(pmtilesUrl),
+      style: buildBasemapStyle(pmtilesUrl, assetsBaseUrl),
       center: [initialView.longitude, initialView.latitude],
       zoom: initialView.zoom,
       pitch: initialView.pitch,
