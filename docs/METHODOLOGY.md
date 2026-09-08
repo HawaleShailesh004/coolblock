@@ -618,6 +618,16 @@ instance's overlap structure is evidently far more favorable to greedy
 than the worst case, which is itself worth stating plainly rather than
 implying the worst-case bound is what was measured.
 
+**This measurement was originally a one-off notebook run; it is now real,
+reusable code** (§7.2.3's independent-solver verification, substituted
+for Wolfram's `NMaximize` cross-check per `docs/adr/0002-*.md`/`0021-*.md`):
+`engine.verify.optimizer_crosscheck.cross_check_optimizer()` reproduces
+this exact comparison on demand, and
+`engine/tests/test_optimizer_crosscheck.py`'s real-candidate-universe test
+reruns it automatically as part of the default test suite — a regression
+in either solver or in `CoverageObjective` itself would fail a real test,
+not silently drift from what this table says.
+
 ### E2 (third solver) — local search
 
 `engine/optimize/local_search.py` runs a bounded swap-based improvement

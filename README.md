@@ -117,9 +117,27 @@ server-side validator). A request for something with no real constraint
 field (a species-diversity cap, in testing) is disclosed via
 `unsupported_requests`, never silently dropped or invented.
 
-**Remaining Phase 10 scope, per the plan's own MUST/SHOULD/COULD split**
-(§12.1): Wolfram verification is the one SHOULD-tier item still open. L2
-(per-site rationale), L4 (grant packet), and L5 (analyst agent) are
+**§7.2 verification, closed via the fallback `docs/adr/0002-*.md` already
+committed to at Phase 0** (no Wolfram Cloud credential — offered again
+this session, still not available):
+[`docs/adr/0021-*.md`](docs/adr/0021-engine-verify-without-wolfram.md).
+`engine/verify/` now has three real modules, each substituting a specific
+non-Wolfram tool for what the plan asked Wolfram to do — `pint` for
+unit-checked thermal math (`units.py`, promoting `engine/impact/albedo.py`'s
+existing *manual* unit-check comment into code that actually enforces it,
+proven by deliberately constructing and catching a real unit error),
+`sympy` for symbolic calibration (`sensitivity.py`, a real symbolic
+derivative proving beta's confidence interval really does propagate
+linearly into ΔT_peak's, not assumed), and the exact MILP solver already
+built in Phase 6 (`optimizer_crosscheck.py`, formalizing the
+previously-notebook-only 99.6-99.9% CELF-vs-exact measurement as real,
+reusable, tested code — including a deliberately-adversarial instance
+proving the check can detect real disagreement, not just agreement).
+None of this sits on the demo path, matching §7.2's own framing.
+
+**Phase 10 status, per the plan's own MUST/SHOULD/COULD split** (§12.1):
+all three SHOULD-tier items (L1, L6, Wolfram verification) are done. L2
+(per-site rationale), L4 (grant packet), and L5 (analyst agent) remain
 explicitly COULD-tier/roadmap-only, not built in this pass.
 
 ## Quickstart
