@@ -83,11 +83,22 @@ score," never "predicted cooling" — verified live in this session's own
 first real generation, which used that exact language unprompted beyond
 the rule. That same run also caught and corrected one hallucinated number
 via the regeneration path, a live demonstration of L6 doing its job.
-**Known limitation, disclosed rather than hidden**: the account's Claude
-API credit balance ran out partway through this session's testing; the
-feature is built, wired end-to-end, and was proven working with a real
-successful call, but further live verification needs the balance
-topped up.
+**Provider switch added mid-build**
+([`docs/adr/0019-*.md`](docs/adr/0019-groq-fallback-provider-for-the-council-memo.md)):
+the account's Claude API credit balance ran out partway through this
+session's testing, so a second provider (Groq, `openai/gpt-oss-120b`)
+was wired in behind the same `generate_council_memo` call — selectable
+via `MEMO_LLM_PROVIDER` in `.env` or a per-request `provider` param/UI
+dropdown, not a hard swap. Wiring it up surfaced two real, general-purpose
+bugs in L6 that Claude's own generations had never triggered (numbers
+embedded in citation-title *strings* weren't grounded at all; a candidate
+id's hyphen was misread as a unary minus when scanning payload strings) —
+both fixed, both apply to either provider. A full real run against a
+solved scenario, via the actual API endpoint, converged to zero
+unverified numbers with no regeneration needed. Claude remains the
+intended default (`.env.example`) once its balance is topped up; Groq is
+this build's working fallback in the meantime (`.env`'s
+`MEMO_LLM_PROVIDER=groq`).
 
 ## Quickstart
 

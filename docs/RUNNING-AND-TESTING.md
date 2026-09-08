@@ -264,17 +264,21 @@ the ARQ worker), not just the static-file layers above.
    the actual downscaled LST raster). A five-bar chart appears; CoolBlock
    should be the longest bar by a wide margin (measured 4.6-14x over
    TES-score-only across budgets — see `docs/METHODOLOGY.md`).
-10. **"Council memo"** — requires `ANTHROPIC_API_KEY` set in `.env` (a
-    real key with a positive credit balance). Click **Generate council
-    memo** (takes ~15-60s — longer if L6's provenance guard has to
-    trigger one regeneration). The memo should use "prioritization score"
-    language for any cooling/temperature claim, never "predicted
+10. **"Council memo"** — requires either `ANTHROPIC_API_KEY` (Claude,
+    higher quality, ~15-60s) or `GROQ_API_KEY` (Groq, `openai/gpt-oss-120b`,
+    much faster, ~3-8s) set in `.env` with a positive credit balance; the
+    **Model** dropdown above the button picks which one to use for that
+    call, overriding `.env`'s `MEMO_LLM_PROVIDER` default
+    ([`docs/adr/0019-*.md`](docs/adr/0019-groq-fallback-provider-for-the-council-memo.md)).
+    Click **Generate council memo** (longer if L6's provenance guard has
+    to trigger one regeneration). The memo should use "prioritization
+    score" language for any cooling/temperature claim, never "predicted
     cooling" (the honesty rail, enforced in the prompt). Hover any
     underlined number: green means it traced back to this plan's real
     data (a tooltip names the exact field); amber means L6 could not
     verify it even after a retry. A 502 error here (`credit balance is
-    too low`) means the API key's account needs billing/credits, not a
-    bug in this feature.
+    too low`) means the selected provider's account needs billing/credits,
+    not a bug in this feature — try the other provider from the dropdown.
 
 ## 10. Automated checks
 
@@ -296,9 +300,12 @@ handles it. These tests are skipped, not failed, if
 `data/derived/edison-eastlake/candidates.geojson` hasn't been built yet
 (§6) — the solve/export/share tests need it.
 
-**The council-memo tests cost a real Claude API call and are skipped by
+**The council-memo tests cost a real LLM API call and are skipped by
 default.** Set `RUN_LLM_TESTS=1` to run them (e.g. before a demo, or
-after touching `engine/narrate/`):
+after touching `engine/narrate/`) — they run against whatever
+`MEMO_LLM_PROVIDER` resolves to in `.env` (`anthropic` or `groq`; see
+[`docs/adr/0019-*.md`](docs/adr/0019-groq-fallback-provider-for-the-council-memo.md)),
+so run twice with each set to cover both providers:
 
 ```bash
 RUN_LLM_TESTS=1 uv run pytest engine/tests/test_memo_live.py apps/api/tests/test_memo_endpoint_live.py -q

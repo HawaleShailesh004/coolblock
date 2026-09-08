@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from engine.narrate.memo import build_memo_payload
+import pytest
+from engine.narrate.memo import _make_caller, build_memo_payload
 
 
 def _site(rank: int, cost: float, marginal: float, cumulative_cost: float, cumulative: float) -> dict[str, Any]:
@@ -69,3 +70,22 @@ def test_build_memo_payload_top_sites_sorted_by_marginal_gain_descending() -> No
     )
     ranks_in_order = [s["rank"] for s in payload["top_sites_by_marginal_ewcb"]]
     assert ranks_in_order == [2, 3, 1]
+
+
+def test_make_caller_rejects_an_unknown_provider() -> None:
+    """No API cost -- this fails before any SDK client is constructed."""
+    with pytest.raises(ValueError, match="unknown MEMO_LLM_PROVIDER"):
+        _make_caller("openai", None)
+
+
+def test_make_caller_resolves_anthropic_and_groq_without_a_network_call() -> None:
+    """Constructing the client and resolving the model name shouldn't
+    itself make a network request -- only `.create()` does, and this test
+    never calls it."""
+    model, call = _make_caller("anthropic", client=object())
+    assert model == "claude-opus-5"
+    assert callable(call)
+
+    model, call = _make_caller("groq", client=object())
+    assert model == "openai/gpt-oss-120b"
+    assert callable(call)

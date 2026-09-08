@@ -42,6 +42,21 @@ from typing import Any
 # guard errs toward flagging too much, not too little.
 _NUMBER_RE = re.compile(r"[-+]?\$?\d[\d,]*(?:\.\d+)?%?x?\b")
 
+# Same shape, minus the leading sign -- used only when scanning *payload
+# string values* (titles, slugs, ids) for embedded numbers, never on the
+# model's own generated prose. Real bug this closes: a candidate id like
+# "roof-02675-cool_roof" has its ASCII hyphen misread as a unary minus by
+# the sign-aware regex, registering the payload leaf as -2675 -- while the
+# model's own generated text (which typographically upgrades the hyphen to
+# a non-breaking one, U+2011, that the sign-aware regex doesn't recognize
+# as a sign character at all) extracts +2675 from its own citation of the
+# same id. Two different values for what should be the same number, purely
+# from which hyphen character happened to precede the digits, causing a
+# real id-cite to fail verification. A hyphen inside an identifier slug is
+# a word separator, never a minus sign -- prose is the only place a
+# genuinely negative number needs the sign-aware pattern.
+_STRING_EMBEDDED_NUMBER_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?x?\b")
+
 REL_TOLERANCE = 0.01  # 1% relative
 ABS_TOLERANCE = 0.5  # for small numbers where 1% is too tight to be meaningful
 
@@ -64,21 +79,42 @@ def _parse_numeric_token(raw: str) -> float | None:
         return None
 
 
-def flatten_numeric_leaves(payload: Any, path: str = "$") -> dict[str, float]:
-    """Every numeric leaf in `payload`, keyed by its JSON path. Booleans
-    are excluded (Python's `bool` is a subtype of `int`, and `True`/`False`
-    are never a "number" a memo would legitimately cite as one)."""
+# Keys never scanned for embedded numbers even though they're strings --
+# identifiers like a DOI (`10.1371/journal.pone.0249715`) are dense with
+# digit substrings that would otherwise "verify" an unrelated hallucinated
+# number purely by coincidence (a real false-negative risk found while
+# testing this guard against a second model provider -- see
+# docs/adr/0019-*.md).
+_SKIP_STRING_KEYS = {"doi", "url"}
+
+
+def flatten_numeric_leaves(payload: Any, path: str = "$", _key: str | None = None) -> dict[str, float]:
+    """Every numeric leaf in `payload`, keyed by its JSON path -- including
+    numbers embedded *inside* string values (a citation title like "...
+    across 5,723 communities" legitimately grounds the model quoting
+    "5,723," even though that number is text, not a JSON number, in the
+    payload). Booleans are excluded (Python's `bool` is a subtype of
+    `int`, and `True`/`False` are never a "number" a memo would
+    legitimately cite as one); `doi`/`url` string fields are excluded
+    (see `_SKIP_STRING_KEYS`)."""
     leaves: dict[str, float] = {}
     if isinstance(payload, bool):
         return leaves
     if isinstance(payload, int | float):
         leaves[path] = float(payload)
+    elif isinstance(payload, str):
+        if _key is not None and _key.lower() in _SKIP_STRING_KEYS:
+            return leaves
+        for m in _STRING_EMBEDDED_NUMBER_RE.finditer(payload):
+            value = _parse_numeric_token(m.group())
+            if value is not None:
+                leaves.setdefault(f"{path}::text@{m.start()}", value)
     elif isinstance(payload, dict):
         for key, value in payload.items():
-            leaves.update(flatten_numeric_leaves(value, f"{path}.{key}"))
+            leaves.update(flatten_numeric_leaves(value, f"{path}.{key}", _key=key))
     elif isinstance(payload, list):
         for i, value in enumerate(payload):
-            leaves.update(flatten_numeric_leaves(value, f"{path}[{i}]"))
+            leaves.update(flatten_numeric_leaves(value, f"{path}[{i}]", _key=_key))
     return leaves
 
 

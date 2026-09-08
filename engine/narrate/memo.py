@@ -23,16 +23,29 @@ surface or the cooling kernel's degree estimates are discussed. That rule
 lives in `SYSTEM_PROMPT` below, not left to the model to infer, and
 `METHODOLOGY_FACTS` gives it the real, current validation numbers to cite
 if it wants to explain *why*.
+
+**Two providers, selected by `MEMO_LLM_PROVIDER`** (env, default
+`"anthropic"`; the API layer also accepts an explicit `provider=` query
+param override): `claude-opus-5` (Anthropic) or `openai/gpt-oss-120b`
+(Groq). Added when Anthropic's own account ran out of API credit
+mid-build and Groq's free tier was the available alternative --
+`docs/adr/0019-*.md` records the real, measured difference between them:
+Groq is dramatically faster (~3s vs ~60s) but a meaningfully weaker
+instruction-follower for "use ONLY these numbers" (more hallucinated
+derived statistics, and it injected outside general knowledge the prompt
+explicitly forbade), so L6's provenance guard matters *more*, not less,
+on that path -- exactly the kind of thing this guard exists to catch
+regardless of which model is doing the generating.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import anthropic
 from dotenv import load_dotenv
 
 from engine.narrate.provenance import NumberMatch, verify_numbers
@@ -40,8 +53,12 @@ from engine.narrate.provenance import NumberMatch, verify_numbers
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 CITATIONS_PATH = REPO_ROOT / "data" / "cache" / "literature" / "2026-09-04" / "citations.json"
 
-MEMO_MODEL = "claude-opus-5"  # quality, run once (§7.1 model routing) -- claude-sonnet-5 is the interactive/L1/L2 model
-MAX_OUTPUT_TOKENS = 2200
+LLM_PROVIDER_ENV_VAR = "MEMO_LLM_PROVIDER"
+DEFAULT_PROVIDER = "anthropic"
+
+ANTHROPIC_MODEL = "claude-opus-5"  # quality, run once (§7.1 model routing) -- claude-sonnet-5 is the interactive/L1/L2 model
+GROQ_MODEL = "openai/gpt-oss-120b"  # the largest general-purpose text model Groq's free tier currently serves
+MAX_OUTPUT_TOKENS = 4000  # generous headroom for Groq's gpt-oss models, which spend hidden reasoning tokens out of this same budget before their visible output
 
 # Kept in sync by hand with docs/METHODOLOGY.md -- last verified 2026-09-08.
 # A parser over that document would be more automatic and more fragile;
@@ -82,6 +99,10 @@ You will be given a JSON payload of real, already-computed data. Follow these ru
    and venue/publisher).
 6. Target 500-800 words total. Do not pad with generic filler about climate change in general --
    every sentence should trace to something in the payload.
+7. Do not use outside knowledge about this topic, this city, or this neighborhood -- even if you \
+   know a fact to be generally true (a city's canopy goal, a target year, a national statistic), do \
+   not state it unless it appears in the JSON payload above. If you are not certain a number came \
+   from the payload, leave it out entirely rather than include it.
 """
 
 
@@ -156,34 +177,79 @@ class MemoResult:
     regenerated: bool = False
 
 
-def _extract_text(response: anthropic.types.Message) -> str:
-    return "".join(block.text for block in response.content if block.type == "text")
+def _make_caller(provider: str, client: Any | None) -> tuple[str, Any]:
+    """Returns (resolved_model_name, a `call(system: str, user: str) -> str`
+    closure) for the given provider. Isolating the two SDKs' different
+    call shapes (and different "how many output tokens did this actually
+    need" behavior -- Groq's reasoning models spend part of `max_tokens`
+    on hidden reasoning before their visible answer) here is what lets
+    `generate_council_memo` below stay provider-agnostic."""
+    if provider == "anthropic":
+        import anthropic
+
+        anthropic_client = client or anthropic.Anthropic()
+
+        def call_anthropic(system: str, user_message: str) -> str:
+            response = anthropic_client.messages.create(
+                model=ANTHROPIC_MODEL,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                system=system,
+                messages=[{"role": "user", "content": user_message}],
+            )
+            # `getattr(..., "")` rather than an `isinstance`/`.type ==`
+            # narrowed access: response.content is a big discriminated
+            # union (TextBlock/ThinkingBlock/ToolUseBlock/...) and only
+            # TextBlock carries `.text` -- every other block type
+            # contributes nothing, which is correct for a plain-text memo
+            # that never triggers tool use or extended thinking blocks.
+            return "".join(getattr(block, "text", "") for block in response.content)
+
+        return ANTHROPIC_MODEL, call_anthropic
+
+    if provider == "groq":
+        import groq
+
+        groq_client = client or groq.Groq()
+
+        def call_groq(system: str, user_message: str) -> str:
+            response = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                max_completion_tokens=MAX_OUTPUT_TOKENS,
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": user_message}],
+            )
+            return response.choices[0].message.content or ""
+
+        return GROQ_MODEL, call_groq
+
+    raise ValueError(f"unknown {LLM_PROVIDER_ENV_VAR}: {provider!r} -- expected 'anthropic' or 'groq'")
 
 
-def generate_council_memo(payload: dict[str, Any], *, client: anthropic.Anthropic | None = None) -> MemoResult:
+def generate_council_memo(
+    payload: dict[str, Any],
+    *,
+    provider: str | None = None,
+    client: Any | None = None,
+) -> MemoResult:
     """Generates the memo, then runs L6's provenance guard. If any number
     fails to verify, regenerates exactly once with a corrective note
     naming the offending numbers (§7.1 L6: "Unmatched numbers trigger a
     flagged regeneration"); if numbers still fail after that, they are
     returned unverified rather than silently dropped or retried forever
-    ("persistent failures are surfaced to the user")."""
-    load_dotenv()  # ANTHROPIC_API_KEY lives in the repo root .env, same pattern as engine/ingest/d07_census.py
-    client = client or anthropic.Anthropic()
+    ("persistent failures are surfaced to the user").
+
+    `provider` overrides `MEMO_LLM_PROVIDER` (env, default `"anthropic"`)
+    for this one call; `client` overrides the SDK client constructed for
+    whichever provider is selected (mainly for tests)."""
+    load_dotenv()  # ANTHROPIC_API_KEY/GROQ_API_KEY live in the repo root .env, same pattern as engine/ingest/d07_census.py
+    resolved_provider = (provider or os.environ.get(LLM_PROVIDER_ENV_VAR, DEFAULT_PROVIDER)).lower()
+    _model, call = _make_caller(resolved_provider, client)
+
     user_message = (
         "Here is the real, already-computed data for this plan. Use only these numbers.\n\n"
         + json.dumps(payload, indent=2, default=str)
     )
 
-    def _call(extra_system: str = "") -> str:
-        response = client.messages.create(
-            model=MEMO_MODEL,
-            max_tokens=MAX_OUTPUT_TOKENS,
-            system=SYSTEM_PROMPT + extra_system,
-            messages=[{"role": "user", "content": user_message}],
-        )
-        return _extract_text(response)
-
-    text = _call()
+    text = call(SYSTEM_PROMPT, user_message)
     numbers = verify_numbers(text, payload)
     unverified = [n for n in numbers if not n.verified]
     regenerated = False
@@ -195,7 +261,7 @@ def generate_council_memo(payload: dict[str, Any], *, client: anthropic.Anthropi
             f"provided data: {offending}. Rewrite the entire memo using ONLY numbers that appear in "
             f"the JSON payload above."
         )
-        text = _call(correction)
+        text = call(SYSTEM_PROMPT + correction, user_message)
         numbers = verify_numbers(text, payload)
         unverified = [n for n in numbers if not n.verified]
         regenerated = True
