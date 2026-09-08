@@ -264,6 +264,17 @@ the ARQ worker), not just the static-file layers above.
    the actual downscaled LST raster). A five-bar chart appears; CoolBlock
    should be the longest bar by a wide margin (measured 4.6-14x over
    TES-score-only across budgets — see `docs/METHODOLOGY.md`).
+10. **"Council memo"** — requires `ANTHROPIC_API_KEY` set in `.env` (a
+    real key with a positive credit balance). Click **Generate council
+    memo** (takes ~15-60s — longer if L6's provenance guard has to
+    trigger one regeneration). The memo should use "prioritization score"
+    language for any cooling/temperature claim, never "predicted
+    cooling" (the honesty rail, enforced in the prompt). Hover any
+    underlined number: green means it traced back to this plan's real
+    data (a tooltip names the exact field); amber means L6 could not
+    verify it even after a retry. A 502 error here (`credit balance is
+    too low`) means the API key's account needs billing/credits, not a
+    bug in this feature.
 
 ## 10. Automated checks
 
@@ -284,6 +295,14 @@ dev data) — no other setup is required, `apps/api/tests/conftest.py`
 handles it. These tests are skipped, not failed, if
 `data/derived/edison-eastlake/candidates.geojson` hasn't been built yet
 (§6) — the solve/export/share tests need it.
+
+**The council-memo tests cost a real Claude API call and are skipped by
+default.** Set `RUN_LLM_TESTS=1` to run them (e.g. before a demo, or
+after touching `engine/narrate/`):
+
+```bash
+RUN_LLM_TESTS=1 uv run pytest engine/tests/test_memo_live.py apps/api/tests/test_memo_endpoint_live.py -q
+```
 
 All of these are expected to be clean on `main` at all times — if one
 fails after pulling latest, that's a regression, not a "known issue."

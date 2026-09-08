@@ -108,3 +108,24 @@ class ShareLinkOut(BaseModel):
     token: str
     scenario_version_id: uuid.UUID
     created_at: datetime
+
+
+class MemoNumberOut(BaseModel):
+    """One number the memo's text cites, and whether L6's provenance
+    guard could trace it back to the real payload -- lets the frontend
+    render each number with a hover showing its source, or a warning if
+    it couldn't be verified (§7.1 L6)."""
+
+    raw: str
+    value: float
+    start: int
+    end: int
+    verified: bool
+    path: str | None
+
+
+class MemoOut(BaseModel):
+    text: str
+    numbers: list[MemoNumberOut]
+    unverified_count: int
+    regenerated: bool

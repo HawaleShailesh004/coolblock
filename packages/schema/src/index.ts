@@ -16,3 +16,5 @@ export type Annotation = components["schemas"]["AnnotationOut"];
 export type AnnotationCreate = components["schemas"]["AnnotationCreate"];
 export type ShareLink = components["schemas"]["ShareLinkOut"];
 export type ConstraintsIn = components["schemas"]["ConstraintsIn"];
+export type Memo = components["schemas"]["MemoOut"];
+export type MemoNumber = components["schemas"]["MemoNumberOut"];

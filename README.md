@@ -68,6 +68,27 @@ the scenario's own budget, via a new `/baselines` endpoint. See §9.1 of
 [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) to verify all
 of it.
 
+**10 (started)**: the intelligence layer — L3, the council memo, and L6,
+its numeric provenance guard. Claude (opus, "quality, run once") drafts
+the memo against this plan's own real, computed data (sites, EWCB,
+citations to the five real papers D16 already registered); every number
+in the output is then extracted and checked against that same data
+(`engine/narrate/provenance.py`), regenerated once if anything fails to
+verify, and rendered with a hover showing each number's exact source
+(green) or a warning if it still couldn't be verified (amber). The
+honesty rail is enforced in the prompt itself, not left to chance: the
+heat surface's validation gate didn't clear all three checks (2 of 3, see
+`docs/METHODOLOGY.md`), so the model is instructed to say "prioritization
+score," never "predicted cooling" — verified live in this session's own
+first real generation, which used that exact language unprompted beyond
+the rule. That same run also caught and corrected one hallucinated number
+via the regeneration path, a live demonstration of L6 doing its job.
+**Known limitation, disclosed rather than hidden**: the account's Claude
+API credit balance ran out partway through this session's testing; the
+feature is built, wired end-to-end, and was proven working with a real
+successful call, but further live verification needs the balance
+topped up.
+
 ## Quickstart
 
 Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/),

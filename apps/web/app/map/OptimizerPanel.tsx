@@ -16,6 +16,7 @@ import {
 } from "../../lib/api";
 import { subscribeToEventStream, type EventStreamSubscription } from "../../lib/sse";
 import { BaselineComparisonChart } from "./BaselineComparisonChart";
+import { CouncilMemoPanel } from "./CouncilMemoPanel";
 
 // Mirrors engine.optimize.plan_service's StageEvent/SiteEvent/DoneEvent
 // dataclasses, exactly as coolblock_api/jobs/events.py serializes them to
@@ -381,6 +382,10 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
           {baselineError && <p style={{ fontSize: 11, color: "var(--warn)", marginTop: 4 }}>{baselineError}</p>}
           {baselineComparison && <BaselineComparisonChart result={baselineComparison} />}
         </div>
+      )}
+
+      {status === "done" && planId && version != null && (
+        <CouncilMemoPanel planId={planId} version={version} />
       )}
 
       {sites.length > 0 && (

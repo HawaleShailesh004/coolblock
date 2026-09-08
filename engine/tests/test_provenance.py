@@ -1,0 +1,50 @@
+"""L6 -- the numeric provenance guard. Pure logic, no API cost."""
+
+from __future__ import annotations
+
+from engine.narrate.provenance import flatten_numeric_leaves, verify_numbers
+
+
+def test_flatten_numeric_leaves_walks_nested_dicts_and_lists() -> None:
+    payload = {"budget_usd": 50000.0, "sites": [{"cost_usd": 807.45}, {"cost_usd": 1200}], "solver": "celf"}
+    leaves = flatten_numeric_leaves(payload)
+    assert leaves["$.budget_usd"] == 50000.0
+    assert leaves["$.sites[0].cost_usd"] == 807.45
+    assert leaves["$.sites[1].cost_usd"] == 1200.0
+    assert "$.solver" not in leaves  # a string, not a number
+
+
+def test_flatten_numeric_leaves_excludes_booleans() -> None:
+    leaves = flatten_numeric_leaves({"public_land_only": True, "count": 3})
+    assert "$.public_land_only" not in leaves
+    assert leaves["$.count"] == 3.0
+
+
+def test_verify_numbers_matches_a_number_present_in_the_payload() -> None:
+    payload = {"budget_usd": 50000.0, "n_sites": 27}
+    matches = verify_numbers("We recommend spending $50,000 across 27 sites.", payload)
+    assert all(m.verified for m in matches)
+    budget_match = next(m for m in matches if m.value == 50000.0)
+    assert budget_match.path == "$.budget_usd"
+
+
+def test_verify_numbers_flags_a_number_absent_from_the_payload() -> None:
+    payload = {"budget_usd": 50000.0}
+    matches = verify_numbers("The plan costs $999,999 in total.", payload)
+    assert len(matches) == 1
+    assert matches[0].verified is False
+    assert matches[0].path is None
+
+
+def test_verify_numbers_respects_relative_tolerance_for_large_values() -> None:
+    payload = {"total_ewcb": 110170.57}
+    # off by less than 1%
+    matches = verify_numbers("The total modeled benefit was 110,200.", payload)
+    assert matches[0].verified is True
+
+
+def test_verify_numbers_rejects_values_outside_tolerance() -> None:
+    payload = {"total_ewcb": 110170.57}
+    # off by more than 1% and more than the absolute floor
+    matches = verify_numbers("The total modeled benefit was 130,000.", payload)
+    assert matches[0].verified is False
