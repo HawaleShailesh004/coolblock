@@ -153,10 +153,27 @@ fontstacks/Unicode ranges this neighborhood's real labels need, matching
 `scripts/build_basemap.sh`'s own established self-hosting pattern). Found
 and fixed a real Windows/Docker bug along the way: a bind-mount with a
 plain Git-Bash POSIX path silently bound to nothing on this machine.
+**Second finding, same pass**: no error boundaries and no security
+headers existed at all. Added
+[`docs/adr/0023-*.md`](docs/adr/0023-error-boundaries-and-csp.md): a
+styled 404 (`not-found.tsx`), a route-level error boundary with a real
+"Try again" recovery action (`error.tsx`), a root-layout-crash fallback
+(`global-error.tsx`), and a CSP scoped to exactly the three local
+services the client actually talks to (audited, not guessed — the API,
+TiTiler, and MinIO). Disclosed tradeoff: `script-src`/`style-src` keep
+`'unsafe-inline'` for Next's own inline hydration scripts rather than
+building a nonce-based strict CSP unverifiable without a browser this
+session — confirmed via `curl` that every header applies correctly, but
+whether the map's WebGL rendering is CSP-clean needs a real browser
+check, flagged as the one open item. Also fixed a real bug found while
+in `next.config.ts`: the previous session's `NEXT_PUBLIC_MAP_ASSETS_URL`
+was never added to the explicit client-env allowlist, so an override in
+`.env` would have been silently ignored.
+
 Phase 13's much larger remaining scope (E2E Playwright suite, golden-file
-tests, error-boundary coverage, security hardening, performance/bundle
-work, cross-browser testing) is untouched — this is one concrete slice,
-not a claim the phase is done.
+tests, security audit beyond CSP, performance/bundle work, cross-browser
+testing) is untouched — these are two concrete slices, not a claim the
+phase is done.
 
 ## Quickstart
 
