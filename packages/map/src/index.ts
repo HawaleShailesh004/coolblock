@@ -1,5 +1,5 @@
 export { CoolBlockMap } from "./CoolBlockMap";
-export type { CoolBlockMapProps, SelectedFeature } from "./CoolBlockMap";
+export type { CoolBlockMapProps, LayerLoadStatus, SelectedFeature } from "./CoolBlockMap";
 // Re-exported so callers building a `liveLayers` entry (Phase 8) don't need
 // their own direct dependency on @deck.gl/core just for this one type.
 export type { Layer } from "@deck.gl/core";

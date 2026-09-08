@@ -16,6 +16,17 @@ export interface SelectedFeature {
   properties: Record<string, unknown>;
 }
 
+/**
+ * Per-layer load state (Phase 8: "real loading/empty/error states for
+ * every surface," not a silent unhandled-rejection when a fetch fails).
+ * `count` is only meaningful once `status` is `"loaded"`.
+ */
+export interface LayerLoadStatus {
+  status: "loading" | "loaded" | "error";
+  count?: number;
+  error?: string;
+}
+
 const HEAT_SOURCE_ID = "heat-surface-src";
 const HEAT_LAYER_ID = "heat-surface-layer";
 
@@ -26,7 +37,22 @@ export interface CoolBlockMapProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   layers: LayerRegistration<any>[];
   visibility: Record<string, boolean>;
-  onDataLoaded?: (counts: Record<string, number>) => void;
+  /** Called with the full status map every time any layer's load state changes (starts all `"loading"`). */
+  onLayerStatusChange?: (statuses: Record<string, LayerLoadStatus>) => void;
+  /**
+   * Called once per layer, right after it loads successfully, with its
+   * raw data -- so a caller can render it as a table (§8.6: "every map
+   * layer has a table view... a peer view, and it doubles as the export
+   * preview"), not just as pins on the map.
+   */
+  onLayerDataLoaded?: (layerId: string, data: unknown) => void;
+  /**
+   * Called once, at mount, with a function the caller can invoke later to
+   * retry one layer's `loadData()` -- the recovery action a real error
+   * state needs (§1.2: "Typed error states with a recovery action"), not
+   * just a page reload.
+   */
+  onRetryHandleReady?: (retry: (layerId: string) => void) => void;
   onFeatureClick?: (feature: SelectedFeature | null) => void;
   /** TiTiler base URL + the COG's own URL (e.g. s3://bucket/key.tif) -- omit to skip the layer entirely. */
   heatSurface?: { titilerBaseUrl: string; cogUrl: string };
@@ -45,7 +71,9 @@ export function CoolBlockMap({
   pmtilesUrl,
   layers,
   visibility,
-  onDataLoaded,
+  onLayerStatusChange,
+  onLayerDataLoaded,
+  onRetryHandleReady,
   onFeatureClick,
   heatSurface,
   liveLayers,
@@ -54,8 +82,10 @@ export function CoolBlockMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const dataRef = useRef<Map<string, unknown>>(new Map());
+  const onLayerDataLoadedRef = useRef(onLayerDataLoaded);
   const visibilityRef = useRef(visibility);
   const onFeatureClickRef = useRef(onFeatureClick);
+  const onLayerStatusChangeRef = useRef(onLayerStatusChange);
   const liveLayersRef = useRef<Layer[]>(liveLayers ?? []);
   const refreshLayersRef = useRef<() => void>(() => {});
   const setHeatVisibilityRef = useRef<(visible: boolean) => void>(() => {});
@@ -70,6 +100,12 @@ export function CoolBlockMap({
   useEffect(() => {
     onFeatureClickRef.current = onFeatureClick;
   }, [onFeatureClick]);
+  useEffect(() => {
+    onLayerStatusChangeRef.current = onLayerStatusChange;
+  }, [onLayerStatusChange]);
+  useEffect(() => {
+    onLayerDataLoadedRef.current = onLayerDataLoaded;
+  }, [onLayerDataLoaded]);
 
   // Map + overlay lifecycle -- created once per mount.
   useEffect(() => {
@@ -153,22 +189,39 @@ export function CoolBlockMap({
     map.on("moveend", persistViewState);
 
     let cancelled = false;
-    Promise.all(
-      layers.map(async (layer) => {
+    // Per-layer, not Promise.all: one slow or failing layer must not
+    // block every other layer from appearing (§1.2's error-state bar --
+    // a real error state, not a page that silently never renders).
+    const statuses: Record<string, LayerLoadStatus> = Object.fromEntries(
+      layers.map((l) => [l.id, { status: "loading" as const }]),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function loadLayer(layer: LayerRegistration<any>) {
+      statuses[layer.id] = { status: "loading" };
+      onLayerStatusChangeRef.current?.({ ...statuses });
+      try {
         const data = await layer.loadData();
-        if (!cancelled) dataRef.current.set(layer.id, data);
-      }),
-    ).then(() => {
+        if (cancelled) return;
+        dataRef.current.set(layer.id, data);
+        onLayerDataLoadedRef.current?.(layer.id, data);
+        const count = (data as { features?: unknown[] } | undefined)?.features?.length;
+        statuses[layer.id] = { status: "loaded", count };
+      } catch (err) {
+        if (cancelled) return;
+        dataRef.current.delete(layer.id);
+        statuses[layer.id] = { status: "error", error: err instanceof Error ? err.message : String(err) };
+      }
       if (cancelled) return;
       refreshLayers();
-      onDataLoaded?.(
-        Object.fromEntries(
-          layers.map((l) => {
-            const d = dataRef.current.get(l.id) as { features?: unknown[] } | undefined;
-            return [l.id, d?.features?.length ?? 0];
-          }),
-        ),
-      );
+      onLayerStatusChangeRef.current?.({ ...statuses });
+    }
+
+    onLayerStatusChangeRef.current?.({ ...statuses });
+    for (const layer of layers) void loadLayer(layer);
+    onRetryHandleReady?.((layerId: string) => {
+      const layer = layers.find((l) => l.id === layerId);
+      if (layer) void loadLayer(layer);
     });
 
     return () => {
@@ -177,8 +230,10 @@ export function CoolBlockMap({
       map.remove();
       overlayRef.current = null;
     };
-    // Layers, pmtilesUrl, heatSurface and onDataLoaded are fixed for the
-    // app's lifetime (one locked neighborhood, §1.3) -- not re-run on change.
+    // Layers, pmtilesUrl, heatSurface, onRetryHandleReady are fixed for
+    // the app's lifetime (one locked neighborhood, §1.3) -- not re-run on
+    // change. onLayerStatusChange is read via a ref precisely so it can
+    // change freely without this effect re-running.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

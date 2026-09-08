@@ -5,12 +5,15 @@ import {
   DEFAULT_LAYERS,
   DEFAULT_VIEW_STATE,
   type Layer,
+  type LayerLoadStatus,
   type SelectedFeature,
   viewStateToSearchParam,
 } from "@coolblock/map";
-import { useMemo, useState } from "react";
+import type { FeatureCollection } from "geojson";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Command } from "./CommandPalette";
 import { useCommandPalette } from "./CommandPalette";
+import { LayerTableView } from "./LayerTableView";
 import { OptimizerPanel } from "./OptimizerPanel";
 
 // Mirrors config/neighborhood.toml -- the scope lock. Presentation copy only;
@@ -36,10 +39,20 @@ export default function MapPage() {
       [...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE].map((l) => [l.id, l.defaultVisible]),
     ),
   );
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [layerStatuses, setLayerStatuses] = useState<Record<string, LayerLoadStatus>>({});
   const [selected, setSelected] = useState<SelectedFeature | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
   const [liveLayer, setLiveLayer] = useState<Layer | null>(null);
+  const retryLayerRef = useRef<((layerId: string) => void) | null>(null);
+  const handleRetryHandleReady = useCallback((retry: (layerId: string) => void) => {
+    retryLayerRef.current = retry;
+  }, []);
+  const retryLayer = useCallback((layerId: string) => retryLayerRef.current?.(layerId), []);
+  const [layerData, setLayerData] = useState<Record<string, FeatureCollection>>({});
+  const handleLayerDataLoaded = useCallback((layerId: string, data: unknown) => {
+    setLayerData((prev) => ({ ...prev, [layerId]: data as FeatureCollection }));
+  }, []);
+  const [tableViewLayerId, setTableViewLayerId] = useState<string | null>(null);
   // Stabilized so CoolBlockMap's liveLayers effect only refires when the
   // live-solution layer itself actually changes, not on every unrelated
   // page.tsx re-render (a new array literal every render would otherwise
@@ -95,13 +108,17 @@ export default function MapPage() {
           layers={[...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE]}
           visibility={visibility}
           onChange={setVisibility}
-          counts={counts}
+          statuses={layerStatuses}
+          onRetry={retryLayer}
+          onOpenTable={setTableViewLayerId}
         />
         <CoolBlockMap
           pmtilesUrl={PMTILES_URL}
           layers={DEFAULT_LAYERS}
           visibility={visibility}
-          onDataLoaded={setCounts}
+          onLayerStatusChange={setLayerStatuses}
+          onLayerDataLoaded={handleLayerDataLoaded}
+          onRetryHandleReady={handleRetryHandleReady}
           onFeatureClick={setSelected}
           heatSurface={{ titilerBaseUrl: TITILER_URL, cogUrl: HEAT_SURFACE_COG_URL }}
           liveLayers={liveLayers}
@@ -110,6 +127,13 @@ export default function MapPage() {
         <OptimizerPanel onLiveLayerChange={setLiveLayer} />
       </div>
       {palette}
+      {tableViewLayerId && layerData[tableViewLayerId] && (
+        <LayerTableView
+          label={[...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE].find((l) => l.id === tableViewLayerId)?.label ?? tableViewLayerId}
+          data={layerData[tableViewLayerId]}
+          onClose={() => setTableViewLayerId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -166,12 +190,16 @@ function InspectorRail({
   layers,
   visibility,
   onChange,
-  counts,
+  statuses,
+  onRetry,
+  onOpenTable,
 }: {
   layers: LayerToggle[];
   visibility: Record<string, boolean>;
   onChange: (v: Record<string, boolean>) => void;
-  counts: Record<string, number>;
+  statuses: Record<string, LayerLoadStatus>;
+  onRetry: (layerId: string) => void;
+  onOpenTable: (layerId: string) => void;
 }) {
   return (
     <aside
@@ -187,19 +215,62 @@ function InspectorRail({
       <section>
         <SectionLabel>Layers</SectionLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
-          {layers.map((layer) => (
-            <label key={layer.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <input
-                type="checkbox"
-                checked={visibility[layer.id] ?? layer.defaultVisible}
-                onChange={(e) => onChange({ ...visibility, [layer.id]: e.target.checked })}
-              />
-              <span style={{ flex: 1 }}>{layer.label}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
-                {counts[layer.id] ?? "..."}
-              </span>
-            </label>
-          ))}
+          {layers.map((layer) => {
+            // The heat surface is a native MapLibre raster layer (see
+            // CoolBlockMap.tsx), not one of CoolBlockMap's registry
+            // layers -- it never reports a load status, and "feature
+            // count" isn't a meaningful concept for a raster.
+            const status = layer.id === "heat-surface" ? null : statuses[layer.id];
+            return (
+              <div key={layer.id}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={visibility[layer.id] ?? layer.defaultVisible}
+                    onChange={(e) => onChange({ ...visibility, [layer.id]: e.target.checked })}
+                  />
+                  <span style={{ flex: 1 }}>{layer.label}</span>
+                  {status?.status === "error" ? (
+                    <button
+                      onClick={() => onRetry(layer.id)}
+                      title={status.error}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--warn)",
+                        cursor: "pointer",
+                        padding: 0,
+                        font: "inherit",
+                        fontSize: 11,
+                      }}
+                    >
+                      failed &middot; retry
+                    </button>
+                  ) : (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, opacity: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                      {status === null ? "" : (status?.count ?? "...")}
+                    </span>
+                  )}
+                </label>
+                {status?.status === "loaded" && (
+                  <button
+                    onClick={() => onOpenTable(layer.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--cool)",
+                      cursor: "pointer",
+                      padding: "0 0 0 24px",
+                      font: "inherit",
+                      fontSize: 10,
+                    }}
+                  >
+                    View as table
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
       <section>
