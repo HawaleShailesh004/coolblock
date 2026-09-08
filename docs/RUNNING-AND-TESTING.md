@@ -94,7 +94,8 @@ Three one-off scripts populate `data/derived/edison-eastlake/` and MinIO.
 Re-run any of them whenever the underlying data changes.
 
 ```bash
-# Buildings, roads, parcels, and Phase 4 candidates -> GeoJSON
+# Buildings, roads, parcels, candidates, the demo optimizer selection, and
+# (Phase 8) dasymetric population + the HVI choropleth -> GeoJSON
 uv run python scripts/export_map_layers.py
 
 # The basemap: a ~4MB neighborhood-scoped extract from Protomaps' public
@@ -218,6 +219,40 @@ This is the real verification checklist — what "it works" means concretely:
 
 If all four of those work, everything built through Phase 4 is verified
 end to end, not just "the code exists."
+
+### 9.1 The live optimizer panel (Phase 8)
+
+Requires the real backend running (§8: API + `alembic upgrade head` +
+the ARQ worker), not just the static-file layers above.
+
+1. **Rightmost panel, "Optimizer"** — a budget slider ($5k–$500k), a
+   "Public land only" toggle, a "Max sites per block group" field, and a
+   **Run optimizer** button.
+2. Click **Run optimizer**. The status line should show live stage
+   messages ("Loading the cached, pre-scored candidate universe" →
+   "Building the equity-weighted coverage objective (D4)" → "Running CELF
+   cost-effective greedy (E2)"), then sites landing on the map **one at a
+   time** — white-outlined polygons appearing in ranked order — with a
+   running "site N · $X of $budget" counter, finishing with a green
+   summary line (site count, total cost, total EWCB, solver name).
+3. **Click a landed site on the map** — the Inspector shows its rank,
+   intervention type, cost, and EWCB contribution, same as any other
+   layer (no special-cased UI for this).
+4. **The ranked-sites table** below the button lists every selected site
+   (rank, type, cost, marginal EWCB) — a full peer view of the same data
+   the map shows, readable with no map at all (§8.6).
+5. Once done, **reload the page** — the plan/version deep-link in the URL
+   (`?plan=...&version=...`) should restore the exact same ranked result
+   without re-solving.
+6. **Export GeoJSON / Export CSV / Share link** — all three should work;
+   the share link should open in a private/incognito window (no auth)
+   and show the same result read-only.
+7. Toggle **"Dasymetric population (D1)"** and **"Heat Vulnerability
+   Index (D2)"** in the left rail — the population layer should shade
+   residential buildings by modeled occupancy, and the HVI layer should
+   colour block groups on a teal (below-average vulnerability) to red
+   (above-average) scale, both toggleable independently of the live
+   optimizer run.
 
 ## 10. Automated checks
 

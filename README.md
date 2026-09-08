@@ -16,7 +16,7 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 
 ## Status
 
-**Phase 7 — backend product surface: in progress.** Phases 0-6 are done:
+**Phase 8 — frontend core: in progress.** Phases 0-6 are done:
 
 - **0-2**: foundations, the data foundry (all 16 sources, see
   [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), and the map, first light.
@@ -36,15 +36,30 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
   the five-baseline comparison (E5) — **CoolBlock beats TES-score-only by
   4.6-14x** on Equity-Weighted Cooling Benefit at equal budget.
 
-**7 (in progress)**: a real FastAPI service — Postgres-backed plans and
-scenario versions, Clerk-shaped auth with a documented local-dev fallback
-(no Clerk tenant provisioned yet, see
+**7**: a real FastAPI service — Postgres-backed plans and scenario
+versions, Clerk-shaped auth with a documented local-dev fallback (no
+Clerk tenant provisioned yet, see
 [`docs/adr/0016-*.md`](docs/adr/0016-auth-dev-fallback-and-clerk-integration.md)),
 an ARQ+Redis job queue that runs the real solver and streams its stages
 over SSE with clean reconnect, GeoJSON/CSV export, and public share links —
 see [`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)
 and §8 of [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) for
-how to run and verify it. The frontend wiring (Phase 8) is next.
+how to run and verify it.
+
+**8 (in progress)**: the live optimizer, wired to that real backend — a
+budget slider and constraint controls that create a plan, trigger a real
+solve, and stream it onto the map site-by-site over a hand-rolled
+`fetch`-based SSE client (`apps/web/lib/sse.ts` — the browser's native
+`EventSource` can't send the custom auth headers this app uses), plus a
+ranked-sites table (a full peer view of the same data, §8.6), GeoJSON/CSV
+export, share links, and a deep-linkable plan/version URL. Two new map
+layers: dasymetric population (D1) and the HVI choropleth (D2). Building
+this frontend caught and fixed a real bug in Phase 7's SSE endpoint (a
+fast client could have its stream closed within milliseconds of
+connecting, before the worker even started — see
+[`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)'s
+amendment) that manual `curl` testing had never caught. See §9.1 of
+[`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) to verify it.
 
 ## Quickstart
 

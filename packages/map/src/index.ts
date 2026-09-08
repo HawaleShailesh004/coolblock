@@ -1,5 +1,8 @@
 export { CoolBlockMap } from "./CoolBlockMap";
 export type { CoolBlockMapProps, SelectedFeature } from "./CoolBlockMap";
+// Re-exported so callers building a `liveLayers` entry (Phase 8) don't need
+// their own direct dependency on @deck.gl/core just for this one type.
+export type { Layer } from "@deck.gl/core";
 export { buildBasemapStyle } from "./basemapStyle";
 export { registerPmtilesProtocol } from "./pmtiles";
 export {
@@ -14,10 +17,14 @@ export {
   DEFAULT_LAYERS,
   INTERVENTION_COLOR,
   buildingsLayer,
+  buildLiveSolutionLayer,
   candidatesLayer,
   createLayerRegistry,
+  hviLayer,
+  optimizerSelectionLayer,
   parcelsLayer,
+  populationLayer,
   roadsLayer,
 } from "./layers";
-export type { LayerRegistration } from "./layers";
+export type { LayerRegistration, LiveSolutionSite } from "./layers";
 export { HEAT_SURFACE_COLORMAP, HEAT_SURFACE_RESCALE, buildHeatSurfaceTileUrl } from "./heatSurface";

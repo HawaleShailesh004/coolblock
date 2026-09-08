@@ -42,6 +42,10 @@ router = APIRouter(prefix="/plans/{plan_id}/scenarios", tags=["scenarios"])
 # not hold a client connection open forever.
 SSE_IDLE_TIMEOUT_SECONDS = 120
 
+# Poll interval for pubsub.get_message()'s own `timeout`, not the idle
+# timeout above -- see the loop below for why this must be short.
+SSE_POLL_INTERVAL_SECONDS = 1.0
+
 
 def _get_scenario_or_404(db: Session, workspace: Workspace, plan_id: uuid.UUID, version: int) -> ScenarioVersion:
     scenario = db.execute(
@@ -137,12 +141,35 @@ async def stream_scenario_events(
                 if envelope.type in ("done", "error"):
                     return
 
+            # redis-py's `get_message(timeout=N)` does not reliably block
+            # for the full N seconds: its *first* call right after
+            # `subscribe()` consumes the subscribe-confirmation control
+            # message Redis sends immediately, and -- because
+            # `ignore_subscribe_messages=True` filters that message out --
+            # returns `None` for that call almost instantly rather than
+            # continuing to wait out the rest of the timeout budget for an
+            # actual data message. Treating any single `None` as "nothing
+            # is coming, give up" (the first version of this loop) closed
+            # the stream within milliseconds of a real client connecting
+            # before the solve had even started -- caught by a genuine
+            # client (not curl, whose own process-start latency usually
+            # let *something* land in the replay list first and masked
+            # it), see docs/adr/0017-*.md's amendment. The fix: poll in
+            # short (`SSE_POLL_INTERVAL_SECONDS`) increments, re-checking
+            # disconnection each time, and only give up once that many
+            # *consecutive* short polls -- not one single wait call -- have
+            # come back empty.
+            idle_seconds = 0.0
             while True:
                 if await request.is_disconnected():
                     return
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=SSE_IDLE_TIMEOUT_SECONDS)
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=SSE_POLL_INTERVAL_SECONDS)
                 if message is None:
-                    return  # idle timeout -- the client (or EventSource) is expected to reconnect with Last-Event-ID
+                    idle_seconds += SSE_POLL_INTERVAL_SECONDS
+                    if idle_seconds >= SSE_IDLE_TIMEOUT_SECONDS:
+                        return  # idle timeout -- the client (or EventSource) is expected to reconnect with Last-Event-ID
+                    continue
+                idle_seconds = 0.0
                 envelope_data = json.loads(message["data"])
                 if envelope_data["seq"] <= seq:
                     continue  # already replayed above; a live publish can race the replay read

@@ -4,12 +4,14 @@ import {
   CoolBlockMap,
   DEFAULT_LAYERS,
   DEFAULT_VIEW_STATE,
+  type Layer,
   type SelectedFeature,
   viewStateToSearchParam,
 } from "@coolblock/map";
 import { useMemo, useState } from "react";
 import type { Command } from "./CommandPalette";
 import { useCommandPalette } from "./CommandPalette";
+import { OptimizerPanel } from "./OptimizerPanel";
 
 // Mirrors config/neighborhood.toml -- the scope lock. Presentation copy only;
 // the engine reads the real file. See docs/adr/0002-scope-lock-and-build-posture.md.
@@ -37,6 +39,12 @@ export default function MapPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<SelectedFeature | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [liveLayer, setLiveLayer] = useState<Layer | null>(null);
+  // Stabilized so CoolBlockMap's liveLayers effect only refires when the
+  // live-solution layer itself actually changes, not on every unrelated
+  // page.tsx re-render (a new array literal every render would otherwise
+  // look like a change to the effect's dependency array).
+  const liveLayers = useMemo(() => (liveLayer ? [liveLayer] : []), [liveLayer]);
 
   const commands: Command[] = useMemo(
     () => [
@@ -82,7 +90,7 @@ export default function MapPage() {
       }}
     >
       <TopBar onOpenPalette={() => setOpen(true)} copyStatus={copyStatus} />
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 280px", overflow: "hidden" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 280px 300px", overflow: "hidden" }}>
         <InspectorRail
           layers={[...DEFAULT_LAYERS, HEAT_SURFACE_TOGGLE]}
           visibility={visibility}
@@ -96,8 +104,10 @@ export default function MapPage() {
           onDataLoaded={setCounts}
           onFeatureClick={setSelected}
           heatSurface={{ titilerBaseUrl: TITILER_URL, cogUrl: HEAT_SURFACE_COG_URL }}
+          liveLayers={liveLayers}
         />
         <ContextPanel selected={selected} />
+        <OptimizerPanel onLiveLayerChange={setLiveLayer} />
       </div>
       {palette}
     </div>

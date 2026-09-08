@@ -119,3 +119,39 @@ was.
   within the plan's own "20k features at 60fps" bar (§3.3) -- a tiling
   pipeline would be solving a scale problem this neighborhood doesn't
   have yet. Revisit if/when Phase 15 generalizes to a larger second city.
+
+## Amendment (2026-09-08, Phase 8): the SSE idle-timeout check had a real bug
+
+Building Phase 8's frontend (the actual `fetch`-based SSE client,
+`apps/web/lib/sse.ts`) surfaced a bug in decision 4's live-wait loop that
+every Phase 7 test missed, because they all exercised `replay_events_after`
+directly against an *already-finished* job -- pure replay, never the
+live-wait branch.
+
+**The bug**: `redis.asyncio`'s `pubsub.get_message(timeout=N)` does not
+reliably block for the full `N` seconds. Its *first* call right after
+`subscribe()` consumes the subscribe-confirmation control message Redis
+sends immediately; because the endpoint passes `ignore_subscribe_messages=True`,
+that message is filtered out and the call returns `None` almost
+instantly rather than continuing to wait out the remaining timeout budget
+for an actual data message. The original code treated any single `None`
+as "nothing will ever arrive" and closed the stream -- meaning a client
+that connected before the solve had even started (a fast client racing a
+job whose replay list is still empty) had its connection closed within
+milliseconds, before the worker ever published anything. Manual `curl`
+verification during Phase 7 never caught this because curl's own
+process-spawn latency usually let at least one event land in the replay
+list first, masking the live-wait branch entirely.
+
+**The fix**: poll `get_message()` in short (`SSE_POLL_INTERVAL_SECONDS =
+1.0`) increments inside the same loop, re-checking `is_disconnected()`
+every poll, and only actually give up once that many *consecutive* short
+polls -- not one single long `timeout=` call -- have come back empty
+(tracked via `idle_seconds` against `SSE_IDLE_TIMEOUT_SECONDS`).
+
+Caught and pinned down with a regression test
+(`apps/api/tests/test_solve_end_to_end.py::test_sse_endpoint_does_not_close_before_the_worker_publishes_anything`)
+that opens the real HTTP endpoint via `httpx.ASGITransport` and starts
+reading *concurrently* with the solve job (`asyncio.gather`), not
+sequentially after it -- confirmed to fail against the pre-fix code and
+pass against the fix.

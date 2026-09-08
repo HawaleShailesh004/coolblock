@@ -53,6 +53,12 @@ def _ensure_test_database_exists() -> None:
 @pytest.fixture(scope="session", autouse=True)
 def _test_database() -> None:
     _ensure_test_database_exists()
+    # Importing the models module (not just db.base) is required here, not
+    # optional -- it's what registers every table on `Base.metadata` in the
+    # first place. Running the full suite happens to import this earlier
+    # too (test_auth.py imports it at module level), which is why this
+    # only broke when running a single test file in isolation.
+    import coolblock_api.db.models  # noqa: F401
     from coolblock_api.db.base import Base, engine
 
     Base.metadata.create_all(engine)

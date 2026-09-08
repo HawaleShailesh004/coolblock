@@ -19,11 +19,13 @@ from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+from engine.equity.hvi import compute_hvi
+from engine.equity.population import redistribute_population
 from engine.impact.albedo import run_albedo_model
 from engine.impact.cooling_kernel import CoolingKernelCalibration, run_cooling_kernel
 from engine.impact.ewcb import compute_ewcb
 from engine.impact.shade import run_shade_raytrace
-from engine.ingest import d04_osm, d06_parcels
+from engine.ingest import d04_osm, d06_parcels, d07b_tiger_bg
 from engine.ingest.manifest import version_dir
 from engine.optimize.celf import solve
 from engine.optimize.objective import build_coverage_objective
@@ -168,6 +170,58 @@ def export_optimizer_solution(budget_usd: float = DEFAULT_OPTIMIZER_BUDGET_USD) 
     return out_path
 
 
+def export_population() -> Path:
+    """Phase 8 -- D1's dasymetric population (`engine.equity.population.redistribute_population`)
+    as its own map layer: real residential building footprints, each
+    carrying its share of its block group's ACS population (weighted by
+    footprint area x floor count, capped at a plausible density -- see
+    that module's docstring for the two real OSM misclassifications this
+    caught and fixed). Distinct from `buildings.geojson` (Phase 1, every
+    building) -- this is only the subset D1 classified residential, with
+    the population fields D1 computed, not a duplicate export."""
+    buildings = redistribute_population()
+    out = buildings[
+        [
+            "block_group_geoid",
+            "population",
+            "population_uncapped",
+            "block_group_population",
+            "footprint_m2",
+            "floor_count",
+            "geometry",
+        ]
+    ].to_crs(epsg=4326)
+    out_path = OUT_DIR / "population.geojson"
+    out.to_file(out_path, driver="GeoJSON")
+    return out_path
+
+
+def export_hvi_choropleth() -> Path:
+    """Phase 8 -- D2's Heat Vulnerability Index (`engine.equity.hvi.compute_hvi`)
+    joined onto real Census TIGER block-group polygons (D7b) for a
+    choropleth. HVI is a signed z-score composite (see that module's
+    docstring for why: relative to this neighborhood's 23 block groups,
+    not an absolute/citywide scale) -- `hvi` here is the same number D4's
+    EWCB reporting uses, not a separately-computed one."""
+    block_groups = gpd.read_parquet(
+        version_dir(d07b_tiger_bg.SOURCE_ID, d07b_tiger_bg.VERSION) / "block_groups.parquet"
+    )
+    hvi = compute_hvi()
+    merged = block_groups.merge(hvi, left_on="GEOID", right_on="geoid", how="inner")
+    out = gpd.GeoDataFrame(
+        {
+            "geoid": merged["GEOID"],
+            "total_population": merged["total_population"],
+            "hvi": merged["hvi"],
+            "geometry": merged.geometry,
+        },
+        crs=block_groups.crs,
+    ).to_crs(epsg=4326)
+    out_path = OUT_DIR / "hvi.geojson"
+    out.to_file(out_path, driver="GeoJSON")
+    return out_path
+
+
 def main() -> None:
     for label, fn in [
         ("buildings", export_buildings),
@@ -175,6 +229,8 @@ def main() -> None:
         ("parcels", export_parcels),
         ("candidates", export_candidates),
         ("optimizer_selection", export_optimizer_solution),
+        ("population", export_population),
+        ("hvi", export_hvi_choropleth),
     ]:
         path = fn()
         size_kb = path.stat().st_size / 1024

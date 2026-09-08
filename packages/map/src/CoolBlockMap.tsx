@@ -1,7 +1,7 @@
 "use client";
 
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import type { PickingInfo } from "@deck.gl/core";
+import type { Layer, PickingInfo } from "@deck.gl/core";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
@@ -30,6 +30,14 @@ export interface CoolBlockMapProps {
   onFeatureClick?: (feature: SelectedFeature | null) => void;
   /** TiTiler base URL + the COG's own URL (e.g. s3://bucket/key.tif) -- omit to skip the layer entirely. */
   heatSurface?: { titilerBaseUrl: string; cogUrl: string };
+  /**
+   * Deck.gl layers built and owned by the caller, outside the static
+   * registry -- for data that arrives incrementally after mount (Phase 8's
+   * live optimizer solve, streamed over SSE) rather than once via a
+   * registry entry's `loadData()`. Rendered on top of every registry
+   * layer, in array order.
+   */
+  liveLayers?: Layer[];
   className?: string;
 }
 
@@ -40,6 +48,7 @@ export function CoolBlockMap({
   onDataLoaded,
   onFeatureClick,
   heatSurface,
+  liveLayers,
   className,
 }: CoolBlockMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +56,7 @@ export function CoolBlockMap({
   const dataRef = useRef<Map<string, unknown>>(new Map());
   const visibilityRef = useRef(visibility);
   const onFeatureClickRef = useRef(onFeatureClick);
+  const liveLayersRef = useRef<Layer[]>(liveLayers ?? []);
   const refreshLayersRef = useRef<() => void>(() => {});
   const setHeatVisibilityRef = useRef<(visible: boolean) => void>(() => {});
 
@@ -127,7 +137,7 @@ export function CoolBlockMap({
       const built = layers
         .filter((l) => dataRef.current.has(l.id))
         .map((l) => l.buildLayer(dataRef.current.get(l.id), visibilityRef.current[l.id] ?? l.defaultVisible));
-      overlay.setProps({ layers: built });
+      overlay.setProps({ layers: [...built, ...liveLayersRef.current] });
     }
     refreshLayersRef.current = refreshLayers;
 
@@ -178,6 +188,14 @@ export function CoolBlockMap({
     refreshLayersRef.current();
     setHeatVisibilityRef.current(visibility["heat-surface"] ?? true);
   }, [visibility]);
+
+  // Live layers (Phase 8: sites landing one at a time from an SSE-driven
+  // solve) change far more often than visibility does -- every accepted
+  // site is a new array from the caller. Same rebuild path, no map teardown.
+  useEffect(() => {
+    liveLayersRef.current = liveLayers ?? [];
+    refreshLayersRef.current();
+  }, [liveLayers]);
 
   return <div ref={containerRef} className={className} style={{ width: "100%", height: "100%" }} />;
 }

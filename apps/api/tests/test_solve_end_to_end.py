@@ -18,6 +18,9 @@ Skips if the cached candidate export doesn't exist yet on this machine
 
 from __future__ import annotations
 
+import asyncio
+
+import httpx
 import pytest
 from conftest import auth_headers
 from engine.optimize.plan_service import CANDIDATES_PATH, SolveParams
@@ -67,6 +70,55 @@ async def test_solve_persists_sites_and_marks_scenario_done(client: TestClient) 
     assert len(detail["sites"]) == result["n_sites"]
     assert detail["sites"][0]["rank"] == 1
     assert detail["sites"][0]["geometry"]["type"] == "Polygon"
+
+
+@pytest.mark.asyncio
+async def test_sse_endpoint_does_not_close_before_the_worker_publishes_anything(client: TestClient) -> None:
+    """Regression test for a real bug caught during Phase 8 frontend
+    integration (docs/adr/0017-*.md's amendment): `redis.asyncio`'s
+    `pubsub.get_message(timeout=N)` returns `None` almost instantly on its
+    *first* call right after `subscribe()` -- it consumes the
+    subscribe-confirmation control message Redis sends immediately, and
+    filters it out. An earlier version of the SSE endpoint treated any
+    single `None` as "nothing is ever coming" and closed the stream within
+    milliseconds of connecting, before the worker had even started.
+
+    The original Phase 7 SSE test (`test_sse_stream_replays_from_a_given_sequence_after_solve_completes`,
+    below) never caught this because it called `replay_events_after`
+    directly against an *already-finished* job -- pure replay, never
+    touching the live-wait branch this bug lived in. This test opens the
+    real HTTP endpoint and starts reading *before* the solve has published
+    anything, racing it against the real job the same way a real, fast
+    client (this test, or the actual frontend) does."""
+    from coolblock_api.main import app
+
+    plan = client.post("/plans", json={"name": "SSE race test", "budget_usd": 15000}, headers=auth_headers()).json()
+    scenario = client.post(f"/plans/{plan['id']}/solve", headers=auth_headers()).json()
+
+    event_types: list[str] = []
+
+    async def read_stream() -> None:
+        transport = httpx.ASGITransport(app=app)
+        async with (
+            httpx.AsyncClient(transport=transport, base_url="http://test") as http_client,
+            http_client.stream(
+                "GET",
+                f"/plans/{plan['id']}/scenarios/{scenario['version_number']}/events",
+                headers=auth_headers(),
+                timeout=30.0,
+            ) as response,
+        ):
+            async for line in response.aiter_lines():
+                if line.startswith("event:"):
+                    event_types.append(line.split(":", 1)[1].strip())
+
+    # Concurrent, not sequential -- the stream-reader starts before the
+    # solve job has run at all, which is exactly the timing the bug needed.
+    await asyncio.gather(read_stream(), _run_solve_job(scenario, plan["budget_usd"]))
+
+    assert event_types[0] == "stage"
+    assert event_types.count("site") > 0
+    assert event_types[-1] == "done"
 
 
 @pytest.mark.asyncio
