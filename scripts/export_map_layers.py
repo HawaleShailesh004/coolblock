@@ -202,17 +202,29 @@ def export_hvi_choropleth() -> Path:
     choropleth. HVI is a signed z-score composite (see that module's
     docstring for why: relative to this neighborhood's 23 block groups,
     not an absolute/citywide scale) -- `hvi` here is the same number D4's
-    EWCB reporting uses, not a separately-computed one."""
+    EWCB reporting uses, not a separately-computed one.
+
+    Also exports the six per-indicator z-scores `compute_hvi()` already
+    computes on the way to `hvi` (called here with its default, all-1.0
+    weights, so these six columns are exactly the *raw*, unweighted
+    z-scores -- multiplying by 1.0 is a no-op). This is what lets the
+    frontend's HVI weight sliders (§6.4 D2: "a planner can and should
+    argue with them") recompute the weighted composite live, client-side,
+    from real per-indicator data -- not by re-fetching or re-deriving
+    anything, since the six numbers a slider needs are already sitting
+    right here."""
     block_groups = gpd.read_parquet(
         version_dir(d07b_tiger_bg.SOURCE_ID, d07b_tiger_bg.VERSION) / "block_groups.parquet"
     )
     hvi = compute_hvi()
+    z_columns = [c for c in hvi.columns if c.startswith("z_")]
     merged = block_groups.merge(hvi, left_on="GEOID", right_on="geoid", how="inner")
     out = gpd.GeoDataFrame(
         {
             "geoid": merged["GEOID"],
             "total_population": merged["total_population"],
             "hvi": merged["hvi"],
+            **{col: merged[col] for col in z_columns},
             "geometry": merged.geometry,
         },
         crs=block_groups.crs,

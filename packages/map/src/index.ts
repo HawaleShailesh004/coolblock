@@ -16,6 +16,7 @@ export type { MapViewState } from "./viewState";
 export {
   DEFAULT_LAYERS,
   INTERVENTION_COLOR,
+  buildHviChoroplethLayer,
   buildingsLayer,
   buildLiveSolutionLayer,
   candidatesLayer,

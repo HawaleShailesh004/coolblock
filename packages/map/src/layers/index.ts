@@ -1,6 +1,6 @@
 import { buildingsLayer } from "./buildings";
 import { candidatesLayer } from "./candidates";
-import { hviLayer } from "./hvi";
+import { buildHviChoroplethLayer, hviLayer } from "./hvi";
 import { optimizerSelectionLayer } from "./optimizerSelection";
 import { parcelsLayer } from "./parcels";
 import { populationLayer } from "./population";
@@ -22,7 +22,16 @@ export const DEFAULT_LAYERS = createLayerRegistry([
   optimizerSelectionLayer,
 ]);
 
-export { buildingsLayer, candidatesLayer, hviLayer, optimizerSelectionLayer, parcelsLayer, populationLayer, roadsLayer };
+export {
+  buildHviChoroplethLayer,
+  buildingsLayer,
+  candidatesLayer,
+  hviLayer,
+  optimizerSelectionLayer,
+  parcelsLayer,
+  populationLayer,
+  roadsLayer,
+};
 export { INTERVENTION_COLOR } from "./candidates";
 export { buildLiveSolutionLayer } from "./liveSolution";
 export type { LiveSolutionSite } from "./liveSolution";

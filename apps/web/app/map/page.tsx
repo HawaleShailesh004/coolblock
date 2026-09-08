@@ -13,6 +13,7 @@ import type { FeatureCollection } from "geojson";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Command } from "./CommandPalette";
 import { useCommandPalette } from "./CommandPalette";
+import { HviWeightsPanel } from "./HviWeightsPanel";
 import { LayerTableView } from "./LayerTableView";
 import { OptimizerPanel } from "./OptimizerPanel";
 
@@ -42,7 +43,18 @@ export default function MapPage() {
   const [layerStatuses, setLayerStatuses] = useState<Record<string, LayerLoadStatus>>({});
   const [selected, setSelected] = useState<SelectedFeature | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
-  const [liveLayer, setLiveLayer] = useState<Layer | null>(null);
+  // Keyed by source rather than a single value: the live optimizer solve
+  // and the HVI weight sliders each own an independent live layer, and
+  // either, both, or neither can be active at once.
+  const [liveLayersBySource, setLiveLayersBySource] = useState<Record<string, Layer | null>>({});
+  const setOptimizerLiveLayer = useCallback(
+    (layer: Layer | null) => setLiveLayersBySource((prev) => ({ ...prev, optimizer: layer })),
+    [],
+  );
+  const setHviWeightsLiveLayer = useCallback(
+    (layer: Layer | null) => setLiveLayersBySource((prev) => ({ ...prev, hviWeights: layer })),
+    [],
+  );
   const retryLayerRef = useRef<((layerId: string) => void) | null>(null);
   const handleRetryHandleReady = useCallback((retry: (layerId: string) => void) => {
     retryLayerRef.current = retry;
@@ -54,10 +66,13 @@ export default function MapPage() {
   }, []);
   const [tableViewLayerId, setTableViewLayerId] = useState<string | null>(null);
   // Stabilized so CoolBlockMap's liveLayers effect only refires when the
-  // live-solution layer itself actually changes, not on every unrelated
-  // page.tsx re-render (a new array literal every render would otherwise
-  // look like a change to the effect's dependency array).
-  const liveLayers = useMemo(() => (liveLayer ? [liveLayer] : []), [liveLayer]);
+  // set of live layers actually changes, not on every unrelated page.tsx
+  // re-render (a new array literal every render would otherwise look
+  // like a change to the effect's dependency array).
+  const liveLayers = useMemo(
+    () => Object.values(liveLayersBySource).filter((l): l is Layer => l != null),
+    [liveLayersBySource],
+  );
 
   const commands: Command[] = useMemo(
     () => [
@@ -111,6 +126,8 @@ export default function MapPage() {
           statuses={layerStatuses}
           onRetry={retryLayer}
           onOpenTable={setTableViewLayerId}
+          hviData={layerData["hvi"]}
+          onHviLiveLayerChange={setHviWeightsLiveLayer}
         />
         <CoolBlockMap
           pmtilesUrl={PMTILES_URL}
@@ -124,7 +141,7 @@ export default function MapPage() {
           liveLayers={liveLayers}
         />
         <ContextPanel selected={selected} />
-        <OptimizerPanel onLiveLayerChange={setLiveLayer} />
+        <OptimizerPanel onLiveLayerChange={setOptimizerLiveLayer} />
       </div>
       {palette}
       {tableViewLayerId && layerData[tableViewLayerId] && (
@@ -193,6 +210,8 @@ function InspectorRail({
   statuses,
   onRetry,
   onOpenTable,
+  hviData,
+  onHviLiveLayerChange,
 }: {
   layers: LayerToggle[];
   visibility: Record<string, boolean>;
@@ -200,6 +219,8 @@ function InspectorRail({
   statuses: Record<string, LayerLoadStatus>;
   onRetry: (layerId: string) => void;
   onOpenTable: (layerId: string) => void;
+  hviData: FeatureCollection | undefined;
+  onHviLiveLayerChange: (layer: Layer | null) => void;
 }) {
   return (
     <aside
@@ -273,6 +294,7 @@ function InspectorRail({
           })}
         </div>
       </section>
+      <HviWeightsPanel data={hviData} onLiveLayerChange={onHviLiveLayerChange} />
       <section>
         <SectionLabel>Neighborhood</SectionLabel>
         <p style={{ fontSize: 12, opacity: 0.7, lineHeight: 1.5, marginTop: 6 }}>
