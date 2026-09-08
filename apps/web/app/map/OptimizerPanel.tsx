@@ -1,6 +1,7 @@
 "use client";
 
 import { buildLiveSolutionLayer, type Layer, type LiveSolutionSite } from "@coolblock/map";
+import type { PlaceResolution } from "@coolblock/schema";
 import type { Geometry } from "geojson";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -9,10 +10,12 @@ import {
   createPlan,
   createShareLink,
   getScenario,
+  parseConstraints,
   scenarioEventsUrl,
   scenarioExportUrl,
   solvePlan,
   updatePlanBudgetAndConstraints,
+  type LlmProvider,
 } from "../../lib/api";
 import { subscribeToEventStream, type EventStreamSubscription } from "../../lib/sse";
 import { BaselineComparisonChart } from "./BaselineComparisonChart";
@@ -100,6 +103,18 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
   const [budgetUsd, setBudgetUsd] = useState(DEFAULT_BUDGET_USD);
   const [publicLandOnly, setPublicLandOnly] = useState(false);
   const [maxSitesPerZone, setMaxSitesPerZone] = useState<number | "">("");
+  const [minSpendPerZoneUsd, setMinSpendPerZoneUsd] = useState<number | "">("");
+  const [annualMaintenanceCapUsd, setAnnualMaintenanceCapUsd] = useState<number | "">("");
+  const [mandatoryIncludeIds, setMandatoryIncludeIds] = useState<string[]>([]);
+  const [mandatoryExcludeIds, setMandatoryExcludeIds] = useState<string[]>([]);
+
+  // §7.1 L1: NL -> optimizer constraints (docs/adr/0020-*.md).
+  const [constraintText, setConstraintText] = useState("");
+  const [constraintProvider, setConstraintProvider] = useState<LlmProvider>("groq");
+  const [parsingConstraints, setParsingConstraints] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [unsupportedRequests, setUnsupportedRequests] = useState<string[]>([]);
+  const [placeResolutions, setPlaceResolutions] = useState<PlaceResolution[]>([]);
 
   // Initialized synchronously from the URL (not in an effect) so a deep
   // link's plan/version id is available on the very first render, with no
@@ -182,10 +197,10 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
     const constraints = {
       public_land_only: publicLandOnly,
       max_sites_per_zone: maxSitesPerZone === "" ? null : maxSitesPerZone,
-      min_spend_per_zone_usd: null,
-      annual_maintenance_cap_usd: null,
-      mandatory_include_ids: [],
-      mandatory_exclude_ids: [],
+      min_spend_per_zone_usd: minSpendPerZoneUsd === "" ? null : minSpendPerZoneUsd,
+      annual_maintenance_cap_usd: annualMaintenanceCapUsd === "" ? null : annualMaintenanceCapUsd,
+      mandatory_include_ids: mandatoryIncludeIds,
+      mandatory_exclude_ids: mandatoryExcludeIds,
     };
 
     try {
@@ -226,7 +241,37 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
       setStatus("error");
       setErrorMessage(err instanceof Error ? err.message : "failed to start the solve");
     }
-  }, [planId, budgetUsd, publicLandOnly, maxSitesPerZone]);
+  }, [
+    planId,
+    budgetUsd,
+    publicLandOnly,
+    maxSitesPerZone,
+    minSpendPerZoneUsd,
+    annualMaintenanceCapUsd,
+    mandatoryIncludeIds,
+    mandatoryExcludeIds,
+  ]);
+
+  const runParseConstraints = useCallback(async () => {
+    if (!constraintText.trim()) return;
+    setParsingConstraints(true);
+    setParseError(null);
+    try {
+      const result = await parseConstraints(constraintText, constraintProvider);
+      setPublicLandOnly(result.constraints.public_land_only);
+      setMaxSitesPerZone(result.constraints.max_sites_per_zone ?? "");
+      setMinSpendPerZoneUsd(result.constraints.min_spend_per_zone_usd ?? "");
+      setAnnualMaintenanceCapUsd(result.constraints.annual_maintenance_cap_usd ?? "");
+      setMandatoryIncludeIds(result.constraints.mandatory_include_ids ?? []);
+      setMandatoryExcludeIds(result.constraints.mandatory_exclude_ids ?? []);
+      setUnsupportedRequests(result.unsupported_requests);
+      setPlaceResolutions(result.place_resolutions);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "failed to parse constraints");
+    } finally {
+      setParsingConstraints(false);
+    }
+  }, [constraintText, constraintProvider]);
 
   const share = useCallback(async () => {
     if (!planId || version == null) return;
@@ -254,6 +299,72 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
   return (
     <aside style={{ borderLeft: "1px solid var(--bg-2)", padding: 14, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
       <SectionLabel>Optimizer</SectionLabel>
+
+      <div>
+        <SectionLabel>Describe constraints (§7.1 L1)</SectionLabel>
+        <textarea
+          value={constraintText}
+          disabled={isBusy || parsingConstraints}
+          onChange={(e) => setConstraintText(e.target.value)}
+          placeholder='e.g. "Keep it to public land only, prioritize sites near Booker T Washington School, cap annual maintenance at $8,000"'
+          rows={3}
+          style={{
+            width: "100%",
+            marginTop: 6,
+            resize: "vertical",
+            background: "var(--bg-1)",
+            color: "var(--paper-0)",
+            border: "1px solid var(--bg-2)",
+            borderRadius: 4,
+            padding: "6px 8px",
+            fontSize: 11,
+            fontFamily: "inherit",
+          }}
+        />
+        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          <select
+            value={constraintProvider}
+            disabled={isBusy || parsingConstraints}
+            onChange={(e) => setConstraintProvider(e.target.value as LlmProvider)}
+            style={{ background: "var(--bg-1)", color: "var(--paper-0)", border: "1px solid var(--bg-2)", borderRadius: 4, padding: "4px 6px", fontSize: 11 }}
+          >
+            <option value="groq">Groq (fast)</option>
+            <option value="anthropic">Claude (higher quality)</option>
+          </select>
+          <button
+            onClick={runParseConstraints}
+            disabled={isBusy || parsingConstraints || !constraintText.trim()}
+            style={{
+              flex: 1,
+              background: "none",
+              border: "1px solid var(--bg-2)",
+              borderRadius: 6,
+              color: "var(--paper-0)",
+              cursor: parsingConstraints ? "default" : "pointer",
+              padding: "4px 10px",
+              fontSize: 11,
+            }}
+          >
+            {parsingConstraints ? "Parsing..." : "Parse with AI"}
+          </button>
+        </div>
+        {parseError && <p style={{ fontSize: 11, color: "var(--warn)", marginTop: 6 }}>{parseError}</p>}
+        {placeResolutions.map((r, i) => {
+          const candidateIds = r.candidate_ids ?? [];
+          return (
+            <p key={i} style={{ fontSize: 11, marginTop: 6, color: r.found ? "var(--ok)" : "var(--warn)" }}>
+              {r.found
+                ? `"${r.query}" -> ${r.matched_name} -- ${candidateIds.length} nearby site${candidateIds.length === 1 ? "" : "s"} included`
+                : `"${r.query}" could not be found in the local map data`}
+            </p>
+          );
+        })}
+        {unsupportedRequests.map((note, i) => (
+          <p key={i} style={{ fontSize: 11, marginTop: 6, color: "var(--warn)" }}>
+            Not supported: {note}
+          </p>
+        ))}
+      </div>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
         <span style={{ display: "flex", justifyContent: "space-between" }}>
@@ -295,6 +406,30 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
           style={{ width: 64, background: "var(--bg-1)", color: "var(--paper-0)", border: "1px solid var(--bg-2)", borderRadius: 4, padding: "2px 6px" }}
         />
       </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+        <span style={{ flex: 1 }}>Annual maintenance cap</span>
+        <input
+          type="number"
+          min={0}
+          placeholder="no cap"
+          value={annualMaintenanceCapUsd}
+          disabled={isBusy}
+          onChange={(e) => setAnnualMaintenanceCapUsd(e.target.value === "" ? "" : Number(e.target.value))}
+          style={{ width: 64, background: "var(--bg-1)", color: "var(--paper-0)", border: "1px solid var(--bg-2)", borderRadius: 4, padding: "2px 6px" }}
+        />
+      </label>
+
+      {(mandatoryIncludeIds.length > 0 || mandatoryExcludeIds.length > 0 || minSpendPerZoneUsd !== "") && (
+        <p style={{ fontSize: 11, opacity: 0.7 }}>
+          {mandatoryIncludeIds.length > 0 && `${mandatoryIncludeIds.length} site${mandatoryIncludeIds.length === 1 ? "" : "s"} mandatory-included`}
+          {mandatoryIncludeIds.length > 0 && (mandatoryExcludeIds.length > 0 || minSpendPerZoneUsd !== "") && " · "}
+          {mandatoryExcludeIds.length > 0 && `${mandatoryExcludeIds.length} excluded`}
+          {mandatoryExcludeIds.length > 0 && minSpendPerZoneUsd !== "" && " · "}
+          {minSpendPerZoneUsd !== "" && `${currency.format(minSpendPerZoneUsd)} min spend/zone`}
+          {" (from constraint parsing)"}
+        </p>
+      )}
 
       <button
         onClick={runOptimizer}

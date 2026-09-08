@@ -279,6 +279,18 @@ the ARQ worker), not just the static-file layers above.
     verify it even after a retry. A 502 error here (`credit balance is
     too low`) means the selected provider's account needs billing/credits,
     not a bug in this feature — try the other provider from the dropdown.
+11. **"Describe constraints"** (§7.1 L1,
+    [`docs/adr/0020-*.md`](docs/adr/0020-nl-to-constraints-with-real-tool-calls.md))
+    — type e.g. `Keep it to public land only, prioritize sites near
+    Booker T Washington School, cap annual maintenance at $8,000` and
+    click **Parse with AI** (takes a few seconds; real API cost, rate
+    limited 5/min/workspace). The public-land checkbox, maintenance-cap
+    field, and a green line naming the resolved school and how many real
+    nearby sites were included should all update. A place that can't be
+    found in the local map data is reported in amber, never silently
+    dropped. Running the optimizer afterward should actually include
+    those sites in the solve — the parsed constraints round-trip into the
+    real solver exactly like a manually-entered one.
 
 ## 10. Automated checks
 
@@ -300,15 +312,16 @@ handles it. These tests are skipped, not failed, if
 `data/derived/edison-eastlake/candidates.geojson` hasn't been built yet
 (§6) — the solve/export/share tests need it.
 
-**The council-memo tests cost a real LLM API call and are skipped by
-default.** Set `RUN_LLM_TESTS=1` to run them (e.g. before a demo, or
-after touching `engine/narrate/`) — they run against whatever
-`MEMO_LLM_PROVIDER` resolves to in `.env` (`anthropic` or `groq`; see
+**The council-memo and constraint-parsing tests cost a real LLM API call
+and are skipped by default.** Set `RUN_LLM_TESTS=1` to run them (e.g.
+before a demo, or after touching `engine/narrate/`) — they run against
+whatever `MEMO_LLM_PROVIDER` resolves to in `.env` (`anthropic` or
+`groq`; see
 [`docs/adr/0019-*.md`](docs/adr/0019-groq-fallback-provider-for-the-council-memo.md)),
 so run twice with each set to cover both providers:
 
 ```bash
-RUN_LLM_TESTS=1 uv run pytest engine/tests/test_memo_live.py apps/api/tests/test_memo_endpoint_live.py -q
+RUN_LLM_TESTS=1 uv run pytest engine/tests/test_memo_live.py apps/api/tests/test_memo_endpoint_live.py engine/tests/test_constraints_nl.py -q
 ```
 
 All of these are expected to be clean on `main` at all times — if one

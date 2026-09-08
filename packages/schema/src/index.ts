@@ -18,3 +18,5 @@ export type ShareLink = components["schemas"]["ShareLinkOut"];
 export type ConstraintsIn = components["schemas"]["ConstraintsIn"];
 export type Memo = components["schemas"]["MemoOut"];
 export type MemoNumber = components["schemas"]["MemoNumberOut"];
+export type ParsedConstraints = components["schemas"]["ParsedConstraintsOut"];
+export type PlaceResolution = components["schemas"]["PlaceResolutionOut"];

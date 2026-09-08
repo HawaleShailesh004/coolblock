@@ -100,6 +100,28 @@ intended default (`.env.example`) once its balance is topped up; Groq is
 this build's working fallback in the meantime (`.env`'s
 `MEMO_LLM_PROVIDER=groq`).
 
+**L1 added** ([`docs/adr/0020-*.md`](docs/adr/0020-nl-to-constraints-with-real-tool-calls.md)):
+natural language to optimizer constraints, via a real, live tool-use loop
+(`engine/narrate/constraints_nl.py`), not a free-text parse. A sentence
+like *"Keep it to public land only, prioritize sites near Booker T
+Washington School, cap annual maintenance at $8,000"* resolves the named
+school against the real cached OSM data, pulls the real candidate ids
+within 300m of its real coordinates, and returns a schema-validated
+constraint set — new `POST /plans/parse-constraints`, wired into
+`OptimizerPanel`'s new "Describe constraints" box. Caught and fixed two
+real bugs live: a CRS bug (`resolve_place` was returning raw UTM-zone-12N
+meters as if they were WGS84 degrees) and a Groq-specific schema
+rejection (the model emitted `null` for an empty list field where the
+tool schema only allowed an array, a real 400 from Groq's own
+server-side validator). A request for something with no real constraint
+field (a species-diversity cap, in testing) is disclosed via
+`unsupported_requests`, never silently dropped or invented.
+
+**Remaining Phase 10 scope, per the plan's own MUST/SHOULD/COULD split**
+(§12.1): Wolfram verification is the one SHOULD-tier item still open. L2
+(per-site rationale), L4 (grant packet), and L5 (analyst agent) are
+explicitly COULD-tier/roadmap-only, not built in this pass.
+
 ## Quickstart
 
 Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/),

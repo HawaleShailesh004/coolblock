@@ -8,8 +8,12 @@ plans")."""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
+import anthropic
+import groq
+from engine.narrate.constraints_nl import ConstraintParseError, parse_constraints
 from engine.optimize.plan_service import SolveParams
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -20,7 +24,16 @@ from coolblock_api.db.base import get_db
 from coolblock_api.db.models import Plan, ScenarioStatus, ScenarioVersion, Workspace, WorkspaceRole
 from coolblock_api.jobs.pool import get_arq_pool
 from coolblock_api.rate_limit import rate_limit
-from coolblock_api.schemas import PlanCreate, PlanOut, PlanUpdate, ScenarioVersionOut
+from coolblock_api.schemas import (
+    ConstraintsIn,
+    ParseConstraintsIn,
+    ParsedConstraintsOut,
+    PlaceResolutionOut,
+    PlanCreate,
+    PlanOut,
+    PlanUpdate,
+    ScenarioVersionOut,
+)
 from coolblock_api.workspace import get_current_workspace
 
 router = APIRouter(prefix="/plans", tags=["plans"])
@@ -51,6 +64,45 @@ def create_plan(
     db.commit()
     db.refresh(plan)
     return plan
+
+
+@router.post("/parse-constraints", response_model=ParsedConstraintsOut)
+async def parse_constraints_endpoint(
+    body: ParseConstraintsIn,
+    workspace: Workspace = Depends(rate_limit("parse_constraints", limit_per_minute=5)),
+) -> ParsedConstraintsOut:
+    """§7.1 L1: NL -> optimizer constraints. A real, live tool-use loop
+    (`engine.narrate.constraints_nl.parse_constraints`) -- resolves any
+    named place against the real cached OSM amenities export before
+    populating `mandatory_include_ids`, never a free-text parse. A real
+    API cost per call, rate-limited for that reason (not persisted or
+    cached server-side: the frontend applies the result to its own
+    in-progress constraint form, the same way a manually-edited constraint
+    would be)."""
+    try:
+        result = await asyncio.to_thread(parse_constraints, body.text, provider=body.provider)
+    except (anthropic.APIError, groq.APIError) as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"constraint parsing failed: {exc.message}") from exc
+    except ConstraintParseError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"constraint parsing failed: {exc}") from exc
+
+    return ParsedConstraintsOut(
+        constraints=ConstraintsIn(
+            public_land_only=result.constraints.public_land_only,
+            max_sites_per_zone=result.constraints.max_sites_per_zone,
+            min_spend_per_zone_usd=result.constraints.min_spend_per_zone_usd,
+            annual_maintenance_cap_usd=result.constraints.annual_maintenance_cap_usd,
+            mandatory_include_ids=result.constraints.mandatory_include_ids,
+            mandatory_exclude_ids=result.constraints.mandatory_exclude_ids,
+        ),
+        unsupported_requests=result.constraints.unsupported_requests,
+        place_resolutions=[
+            PlaceResolutionOut(
+                query=r.query, found=r.found, matched_name=r.matched_name, lat=r.lat, lon=r.lon, candidate_ids=r.candidate_ids
+            )
+            for r in result.place_resolutions
+        ],
+    )
 
 
 @router.get("", response_model=list[PlanOut])

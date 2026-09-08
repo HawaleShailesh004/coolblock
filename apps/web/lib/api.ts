@@ -17,6 +17,7 @@ import type {
   AnnotationCreate,
   ConstraintsIn,
   Memo,
+  ParsedConstraints,
   Plan,
   PlanCreate,
   ScenarioVersion,
@@ -96,7 +97,16 @@ export function compareBaselines(planId: string, version: number): Promise<Recor
   return apiFetch(`/plans/${planId}/scenarios/${version}/baselines`);
 }
 
-export type MemoProvider = "anthropic" | "groq";
+export type LlmProvider = "anthropic" | "groq";
+export type MemoProvider = LlmProvider;
+
+/** §7.1 L1: NL -> optimizer constraints, via a real tool-use loop that resolves named places against the real cached OSM data (docs/adr/0020-*.md). Real API cost per call. */
+export function parseConstraints(text: string, provider?: LlmProvider): Promise<ParsedConstraints> {
+  return apiFetch("/plans/parse-constraints", {
+    method: "POST",
+    body: JSON.stringify({ text, provider: provider ?? null }),
+  });
+}
 
 /** §7.1 L3/L6: the council memo, verified by the numeric provenance guard. Real API cost per call -- not cached client-side across re-renders, only re-fetched when the user explicitly asks again. `provider` overrides the backend's MEMO_LLM_PROVIDER default for this one call (docs/adr/0019-*.md). */
 export function generateMemo(

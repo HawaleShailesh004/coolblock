@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,6 +26,32 @@ class ConstraintsIn(BaseModel):
     annual_maintenance_cap_usd: float | None = None
     mandatory_include_ids: list[str] = Field(default_factory=list)
     mandatory_exclude_ids: list[str] = Field(default_factory=list)
+
+
+class ParseConstraintsIn(BaseModel):
+    """§7.1 L1: one plain-English sentence to parse into `ConstraintsIn`."""
+
+    text: str = Field(min_length=1, max_length=2000)
+    provider: Literal["anthropic", "groq"] | None = None
+
+
+class PlaceResolutionOut(BaseModel):
+    """One named place L1 tried to resolve via a real tool call against
+    the cached OSM amenities export, and the real candidate ids (if any)
+    found near it -- lets the UI show *why* a site was included."""
+
+    query: str
+    found: bool
+    matched_name: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    candidate_ids: list[str] = Field(default_factory=list)
+
+
+class ParsedConstraintsOut(BaseModel):
+    constraints: ConstraintsIn
+    unsupported_requests: list[str]
+    place_resolutions: list[PlaceResolutionOut]
 
 
 class PlanCreate(BaseModel):

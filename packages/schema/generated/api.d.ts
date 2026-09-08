@@ -17,6 +17,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plans/parse-constraints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Constraints Endpoint
+         * @description §7.1 L1: NL -> optimizer constraints. A real, live tool-use loop
+         *     (`engine.narrate.constraints_nl.parse_constraints`) -- resolves any
+         *     named place against the real cached OSM amenities export before
+         *     populating `mandatory_include_ids`, never a free-text parse. A real
+         *     API cost per call, rate-limited for that reason (not persisted or
+         *     cached server-side: the frontend applies the result to its own
+         *     in-progress constraint form, the same way a manually-edited constraint
+         *     would be).
+         */
+        post: operations["parse_constraints_endpoint_plans_parse_constraints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plans/{plan_id}": {
         parameters: {
             query?: never;
@@ -395,6 +422,44 @@ export interface components {
             /** Regenerated */
             regenerated: boolean;
         };
+        /**
+         * ParseConstraintsIn
+         * @description §7.1 L1: one plain-English sentence to parse into `ConstraintsIn`.
+         */
+        ParseConstraintsIn: {
+            /** Text */
+            text: string;
+            /** Provider */
+            provider?: ("anthropic" | "groq") | null;
+        };
+        /** ParsedConstraintsOut */
+        ParsedConstraintsOut: {
+            constraints: components["schemas"]["ConstraintsIn"];
+            /** Unsupported Requests */
+            unsupported_requests: string[];
+            /** Place Resolutions */
+            place_resolutions: components["schemas"]["PlaceResolutionOut"][];
+        };
+        /**
+         * PlaceResolutionOut
+         * @description One named place L1 tried to resolve via a real tool call against
+         *     the cached OSM amenities export, and the real candidate ids (if any)
+         *     found near it -- lets the UI show *why* a site was included.
+         */
+        PlaceResolutionOut: {
+            /** Query */
+            query: string;
+            /** Found */
+            found: boolean;
+            /** Matched Name */
+            matched_name?: string | null;
+            /** Lat */
+            lat?: number | null;
+            /** Lon */
+            lon?: number | null;
+            /** Candidate Ids */
+            candidate_ids?: string[];
+        };
         /** PlanCreate */
         PlanCreate: {
             /** Name */
@@ -620,6 +685,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parse_constraints_endpoint_plans_parse_constraints_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParseConstraintsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParsedConstraintsOut"];
                 };
             };
             /** @description Validation Error */
