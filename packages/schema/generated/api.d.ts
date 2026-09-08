@@ -112,6 +112,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/plans/{plan_id}/scenarios/{version}/baselines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Baselines
+         * @description §9 ★5: "we beat the alternatives." Runs CoolBlock's own CELF solve
+         *     alongside the four real E5 baselines (`engine.optimize.baselines`) at
+         *     this scenario's own plan's budget -- the same number the scenario
+         *     itself was solved at, not a separately-entered one. Real cost
+         *     (~15-20s, dominated by `worst_first`'s real LST-raster sample), run
+         *     via a thread so it doesn't block the event loop for other requests
+         *     while it computes; rate-limited (5/min/workspace) for the same reason
+         *     the solve endpoint is.
+         */
+        get: operations["compare_baselines_plans__plan_id__scenarios__version__baselines_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/plans/{plan_id}/scenarios/{version}/export.geojson": {
         parameters: {
             query?: never;
@@ -747,6 +774,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_baselines_plans__plan_id__scenarios__version__baselines_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */

@@ -253,6 +253,17 @@ the ARQ worker), not just the static-file layers above.
    colour block groups on a teal (below-average vulnerability) to red
    (above-average) scale, both toggleable independently of the live
    optimizer run.
+8. **Left rail, "Equity weights (HVI, D2)"** — six sliders (default 1.0
+   each). Check "Show weighted HVI on map", then drag one slider — the
+   choropleth should visibly recolor live (no network request; it's
+   recomputed client-side from the real per-indicator z-scores). "Reset
+   to equal weights" should appear once any slider moves and should
+   restore the default coloring when clicked.
+9. **After a solve completes, "Beats the alternatives?"** — click
+   **Compare vs. baselines** (takes ~15-20s, real compute: it re-samples
+   the actual downscaled LST raster). A five-bar chart appears; CoolBlock
+   should be the longest bar by a wide margin (measured 4.6-14x over
+   TES-score-only across budgets — see `docs/METHODOLOGY.md`).
 
 ## 10. Automated checks
 

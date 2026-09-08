@@ -15,12 +15,14 @@ the plain-subscribe case, not a special path for it.
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
 import uuid
 from collections.abc import AsyncIterator
 
+from engine.optimize.plan_service import run_baseline_comparison
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from geoalchemy2.shape import to_shape
@@ -32,6 +34,7 @@ from coolblock_api.db.base import get_db
 from coolblock_api.db.models import Plan, ScenarioVersion, Workspace
 from coolblock_api.jobs.events import channel_key, replay_events_after
 from coolblock_api.jobs.redis import get_redis
+from coolblock_api.rate_limit import rate_limit
 from coolblock_api.schemas import ScenarioSiteOut, ScenarioVersionDetailOut, ScenarioVersionOut
 from coolblock_api.workspace import get_current_workspace
 
@@ -183,6 +186,25 @@ async def stream_scenario_events(
             await pubsub.aclose()  # type: ignore[no-untyped-call]
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.get("/{version}/baselines", response_model=dict[str, float])
+async def compare_baselines(
+    plan_id: uuid.UUID,
+    version: int,
+    workspace: Workspace = Depends(rate_limit("baselines", limit_per_minute=5)),
+    db: Session = Depends(get_db),
+) -> dict[str, float]:
+    """§9 ★5: "we beat the alternatives." Runs CoolBlock's own CELF solve
+    alongside the four real E5 baselines (`engine.optimize.baselines`) at
+    this scenario's own plan's budget -- the same number the scenario
+    itself was solved at, not a separately-entered one. Real cost
+    (~15-20s, dominated by `worst_first`'s real LST-raster sample), run
+    via a thread so it doesn't block the event loop for other requests
+    while it computes; rate-limited (5/min/workspace) for the same reason
+    the solve endpoint is."""
+    scenario = _get_scenario_or_404(db, workspace, plan_id, version)
+    return await asyncio.to_thread(run_baseline_comparison, scenario.plan.budget_usd)
 
 
 @router.get("/{version}/export.geojson")

@@ -142,6 +142,20 @@ async def test_sse_stream_replays_from_a_given_sequence_after_solve_completes(cl
 
 
 @pytest.mark.asyncio
+async def test_baselines_endpoint_returns_all_five_strategies_and_coolblock_wins(client: TestClient) -> None:
+    """§9 ★5. Real cost (~15-20s, see engine/tests/test_plan_service.py's
+    matching test) -- kept to one test, not duplicated per budget."""
+    plan = client.post("/plans", json={"name": "Baselines test", "budget_usd": 50000}, headers=auth_headers()).json()
+    scenario = client.post(f"/plans/{plan['id']}/solve", headers=auth_headers()).json()
+
+    resp = client.get(f"/plans/{plan['id']}/scenarios/{scenario['version_number']}/baselines", headers=auth_headers())
+    assert resp.status_code == 200
+    result = resp.json()
+    assert set(result.keys()) == {"spread_evenly", "worst_first", "squeaky_wheel", "tes_score_only", "coolblock"}
+    assert result["coolblock"] > result["tes_score_only"] > 0
+
+
+@pytest.mark.asyncio
 async def test_export_geojson_and_csv_after_solve(client: TestClient) -> None:
     plan = client.post("/plans", json={"name": "Export test", "budget_usd": 15000}, headers=auth_headers()).json()
     scenario = client.post(f"/plans/{plan['id']}/solve", headers=auth_headers()).json()

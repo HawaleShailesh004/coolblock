@@ -107,10 +107,15 @@ was.
   containers, truncated/flushed before every test -- real infra, not
   mocks, per this project's own "No-Fake Rule" (§1.1), without clobbering
   whatever a developer has loaded in the `coolblock` database via `/map`.
-- The five-baseline comparison (E5) and the efficient frontier (E4) still
-  run offline/notebook-side (Phase 6, unchanged); Phase 7 does not expose
-  them as API endpoints yet -- that wiring is Phase 8/9 (★4, ★5) work,
-  tracked there rather than silently included here.
+- The five-baseline comparison (E5) is now exposed as
+  `GET /plans/{plan_id}/scenarios/{version}/baselines` (Phase 8, §9 ★5) --
+  `engine.optimize.plan_service.run_baseline_comparison` runs it via
+  `asyncio.to_thread` (real cost, ~15-20s, dominated by `worst_first`
+  sampling the actual downscaled LST raster) so it doesn't block the
+  event loop, rate-limited like the solve endpoint. The efficient
+  frontier (E4) still runs offline/notebook-side (Phase 6, unchanged);
+  that wiring (★4, an instant lookup against a precomputed budget sweep)
+  is still open.
 - **Descoped, disclosed rather than silently dropped**: PMTiles generation
   for the API's own vector layers (candidates/sites, as opposed to the
   basemap) is not built this phase. At current data volumes (a few

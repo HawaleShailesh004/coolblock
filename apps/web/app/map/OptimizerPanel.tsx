@@ -5,6 +5,7 @@ import type { Geometry } from "geojson";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   authHeaders,
+  compareBaselines,
   createPlan,
   createShareLink,
   getScenario,
@@ -14,6 +15,7 @@ import {
   updatePlanBudgetAndConstraints,
 } from "../../lib/api";
 import { subscribeToEventStream, type EventStreamSubscription } from "../../lib/sse";
+import { BaselineComparisonChart } from "./BaselineComparisonChart";
 
 // Mirrors engine.optimize.plan_service's StageEvent/SiteEvent/DoneEvent
 // dataclasses, exactly as coolblock_api/jobs/events.py serializes them to
@@ -109,6 +111,9 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
   const [summary, setSummary] = useState<DoneEventData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [baselineComparison, setBaselineComparison] = useState<Record<string, number> | null>(null);
+  const [comparingBaselines, setComparingBaselines] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
 
   const subscriptionRef = useRef<EventStreamSubscription | null>(null);
 
@@ -170,6 +175,8 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
     setSummary(null);
     setErrorMessage(null);
     setShareUrl(null);
+    setBaselineComparison(null);
+    setBaselineError(null);
 
     const constraints = {
       public_land_only: publicLandOnly,
@@ -224,6 +231,20 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
     if (!planId || version == null) return;
     const link = await createShareLink(planId, version);
     setShareUrl(`${window.location.origin}/share/${link.token}`);
+  }, [planId, version]);
+
+  const runBaselineComparison = useCallback(async () => {
+    if (!planId || version == null) return;
+    setComparingBaselines(true);
+    setBaselineError(null);
+    try {
+      const result = await compareBaselines(planId, version);
+      setBaselineComparison(result);
+    } catch (err) {
+      setBaselineError(err instanceof Error ? err.message : "failed to compare baselines");
+    } finally {
+      setComparingBaselines(false);
+    }
   }, [planId, version]);
 
   const budgetSpent = sites.length > 0 ? (sites.at(-1)?.cumulative_cost_usd ?? 0) : 0;
@@ -334,6 +355,32 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
           onFocus={(e) => e.currentTarget.select()}
           style={{ fontSize: 10, fontFamily: "var(--font-mono)", background: "var(--bg-1)", color: "var(--paper-0)", border: "1px solid var(--bg-2)", borderRadius: 4, padding: "4px 6px" }}
         />
+      )}
+
+      {status === "done" && (
+        <div>
+          <SectionLabel>Beats the alternatives? (§9 ★5)</SectionLabel>
+          {!baselineComparison && (
+            <button
+              onClick={runBaselineComparison}
+              disabled={comparingBaselines}
+              style={{
+                marginTop: 6,
+                background: "none",
+                border: "1px solid var(--bg-2)",
+                borderRadius: 6,
+                color: "var(--paper-0)",
+                cursor: comparingBaselines ? "default" : "pointer",
+                padding: "6px 10px",
+                fontSize: 11,
+              }}
+            >
+              {comparingBaselines ? "Comparing against 4 real baselines (~20s)..." : "Compare vs. baselines"}
+            </button>
+          )}
+          {baselineError && <p style={{ fontSize: 11, color: "var(--warn)", marginTop: 4 }}>{baselineError}</p>}
+          {baselineComparison && <BaselineComparisonChart result={baselineComparison} />}
+        </div>
       )}
 
       {sites.length > 0 && (

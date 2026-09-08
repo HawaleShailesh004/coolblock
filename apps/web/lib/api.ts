@@ -90,6 +90,11 @@ export function createShareLink(planId: string, version: number): Promise<ShareL
   return apiFetch(`/plans/${planId}/scenarios/${version}/share`, { method: "POST" });
 }
 
+/** §9 ★5: EWCB per strategy (spread_evenly/worst_first/squeaky_wheel/tes_score_only/coolblock), same budget. Real cost, ~15-20s. */
+export function compareBaselines(planId: string, version: number): Promise<Record<string, number>> {
+  return apiFetch(`/plans/${planId}/scenarios/${version}/baselines`);
+}
+
 export function listAnnotations(planId: string): Promise<Annotation[]> {
   return apiFetch(`/plans/${planId}/annotations`);
 }

@@ -19,6 +19,7 @@ from engine.optimize.plan_service import (
     SolveParams,
     StageEvent,
     load_candidate_universe,
+    run_baseline_comparison,
     stream_solve,
 )
 
@@ -96,6 +97,18 @@ def test_site_event_geometry_and_properties_are_json_serializable(universe: gpd.
         }
     )
     assert "candidate_id" in payload
+
+
+def test_baseline_comparison_returns_all_five_strategies_and_coolblock_wins(universe: gpd.GeoDataFrame) -> None:
+    """§9 ★5's API-facing entry point. Real cost: `worst_first`'s baseline
+    samples the actual downscaled LST raster (`engine.thermal.downscale.run_downscaling`,
+    uncached, ~14s to refit) regardless of candidate-set size, so this is
+    one of this suite's slower tests by design, not an accident -- kept to
+    a single test rather than duplicated across budgets."""
+    result = run_baseline_comparison(50_000.0, candidates=universe)
+    assert set(result.keys()) == {"spread_evenly", "worst_first", "squeaky_wheel", "tes_score_only", "coolblock"}
+    assert result["coolblock"] > result["tes_score_only"] > 0
+    assert all(v >= 0 for v in result.values())
 
 
 def test_mandatory_exclude_by_candidate_id_is_honored(universe: gpd.GeoDataFrame) -> None:

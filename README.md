@@ -58,8 +58,15 @@ this frontend caught and fixed a real bug in Phase 7's SSE endpoint (a
 fast client could have its stream closed within milliseconds of
 connecting, before the worker even started — see
 [`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)'s
-amendment) that manual `curl` testing had never caught. See §9.1 of
-[`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) to verify it.
+amendment) that manual `curl` testing had never caught. Also: real
+per-layer loading/error states with a retry action, a table view for
+every layer (§8.6), six HVI weight sliders that recompute the choropleth
+live client-side from real per-indicator z-scores (§6.4 D2's "a planner
+can and should argue with them"), and a real "beats the alternatives"
+screen (§9 ★5) — CoolBlock's own solve against all four E5 baselines, at
+the scenario's own budget, via a new `/baselines` endpoint. See §9.1 of
+[`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) to verify all
+of it.
 
 ## Quickstart
 

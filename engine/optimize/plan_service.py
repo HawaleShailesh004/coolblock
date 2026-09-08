@@ -48,7 +48,7 @@ import geopandas as gpd
 import numpy as np
 
 from engine.config import load_neighborhood_config
-from engine.optimize.baselines import assign_block_group
+from engine.optimize.baselines import assign_block_group, run_all_baselines
 from engine.optimize.celf import Selection, solve
 from engine.optimize.constraints import (
     ConstraintConfig,
@@ -245,3 +245,21 @@ def stream_solve(
         solver_name = "celf"
 
     yield DoneEvent(solver=solver_name, n_sites=n_sites, total_cost_usd=total_cost, total_ewcb=total_value)
+
+
+def run_baseline_comparison(budget_usd: float, candidates: gpd.GeoDataFrame | None = None) -> dict[str, float]:
+    """E5 (COOLBLOCK-BUILD-PLAN.md §6.5 E5), "the proof the product
+    works," exposed as one callable the API can invoke on demand (§9 ★5):
+    runs all five baseline strategies
+    (`engine.optimize.baselines.run_all_baselines`) against the exact same
+    cached candidate universe and budget the live solve itself uses -- so
+    "same budget" in the comparison is literally the same number, not
+    independently re-entered. Slower than a warm solve (the `worst_first`
+    baseline samples the real downscaled LST raster, ~15-20s total,
+    measured) -- a deliberate, on-demand action the user triggers once to
+    see the comparison, not something run on every budget-slider drag."""
+    universe = candidates if candidates is not None else load_candidate_universe()
+    universe = universe.reset_index(drop=True)
+    objective = build_coverage_objective(universe)
+    costs = universe["total_cost_usd"].to_numpy(dtype="float64")
+    return run_all_baselines(universe, objective, costs, budget_usd)
