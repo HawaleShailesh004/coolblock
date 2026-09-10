@@ -3,10 +3,20 @@ import { colorTokens } from "@coolblock/ui";
 import type { FeatureCollection } from "geojson";
 import type { LayerRegistration } from "./registry";
 
+// Semi-transparent, not solid: §9 ★1's own intent is "the surface glows
+// beneath the 3D block" (CoolBlockMap.tsx's comment on the heat-surface
+// layer) -- but at these values' original near-opaque range (190-255),
+// ~2,844 densely-packed buildings viewed from the default pitched camera
+// (pitch=50) visually occlude almost the entire heat surface underneath,
+// a real, confirmed regression against that intent (screenshotted:
+// buildings hidden shows the heat surface rendering correctly; buildings
+// shown hides nearly all of it). Halved so the glow reads through the
+// building volumes while still keeping the honesty-rail's own opacity
+// *ordering* intact (measured > levels > estimated_default).
 const HEIGHT_PROVENANCE_OPACITY: Record<string, number> = {
-  measured: 255,
-  levels: 235,
-  estimated_default: 190, // visibly softer -- an estimate, not a measurement (honesty rail, §1.4)
+  measured: 130,
+  levels: 115,
+  estimated_default: 95, // visibly softer -- an estimate, not a measurement (honesty rail, §1.4)
 };
 
 function hexToRgb(hex: string): [number, number, number] {
