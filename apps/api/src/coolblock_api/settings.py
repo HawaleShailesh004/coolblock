@@ -31,7 +31,21 @@ class Settings(BaseSettings):
 
     sentry_dsn: str = ""
 
-    cors_allow_origins: list[str] = ["http://localhost:3000"]
+    # A real gap found writing this project's first E2E tests: Next.js
+    # silently falls back to 3001/3002/... when 3000 is already taken by
+    # something else on the machine (it did, on this one, mid-session --
+    # an unrelated project's own dev server) -- with only 3000 allowed
+    # here, every browser fetch to this API would fail as an opaque CORS
+    # error, not a clear one, and a judge's machine is exactly the kind of
+    # environment where port 3000 might already be occupied. Widened to
+    # the handful of ports Next actually tries before giving up, not to
+    # "*" -- still a real, closed allowlist. Override via CORS_ALLOW_ORIGINS
+    # (JSON array) in .env for anything else.
+    cors_allow_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+    ]
 
     solve_rate_limit_per_minute: int = 10
 

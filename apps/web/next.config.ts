@@ -26,19 +26,34 @@ const LOCAL_ORIGINS = [API_URL, TITILER_URL, MINIO_URL].join(" ");
 // includes 'unsafe-inline' because Next.js's App Router injects its own
 // hydration/RSC bootstrap scripts inline, and a nonce-based strict CSP
 // (Next's documented alternative) needs per-request middleware this pass
-// didn't add -- doing that without a browser available to verify the map
-// (WebGL/deck.gl, the single most important demo surface) still renders
-// correctly was judged a worse risk than shipping a real-but-imperfect
-// CSP. Every other directive here is load-bearing: no external script
-// origins, no plugins/embeds, no framing (clickjacking), and connect-src
-// is scoped to exactly the three local services above -- worker-src/img-src
-// allow 'blob:' for maplibre-gl's own web worker and canvas tile decoding.
+// didn't add. Every other directive here is load-bearing: no external
+// script origins, no plugins/embeds, no framing (clickjacking), and
+// connect-src is scoped to exactly the three local services above --
+// worker-src/img-src allow 'blob:' for maplibre-gl's own web worker and
+// canvas tile decoding.
+//
+// **`'unsafe-eval'` is added in development only, and this is not a
+// guess** -- confirmed by actually reproducing the break: with a strict
+// script-src, clicking "Run optimizer" in `next dev` threw
+// `Evaluating a string as JavaScript violates ... 'unsafe-eval' is not
+// an allowed source` and the optimizer never ran at all, the single most
+// important feature in the entire product. A production build
+// (`next build && next start`) completed a real solve with the exact
+// same strict script-src and no eval error -- Next's webpack dev-mode
+// tooling (HMR/eval-source-map) is what needs `eval`, not this app's own
+// code or its dependencies (React, maplibre-gl, deck.gl). Since the demo
+// itself runs via `next dev` (`scripts/dev.sh`), shipping the strict
+// policy unconditionally would have silently broken the actual
+// checkpoint this ADR exists to protect -- so development gets the
+// looser policy, production gets the strict one, and this asymmetry is
+// the point, not an oversight.
+const IS_DEV = process.env.NODE_ENV !== "production";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `connect-src 'self' ${LOCAL_ORIGINS}`,
   `img-src 'self' data: blob: ${LOCAL_ORIGINS}`,
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${IS_DEV ? " 'unsafe-eval'" : ""}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

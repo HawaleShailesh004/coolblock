@@ -332,6 +332,24 @@ RUN_LLM_TESTS=1 uv run pytest engine/tests/test_memo_live.py apps/api/tests/test
 All of these are expected to be clean on `main` at all times — if one
 fails after pulling latest, that's a regression, not a "known issue."
 
+**The E2E suite** (§13,
+[`docs/adr/0024-*.md`](docs/adr/0024-e2e-suite-and-four-real-bugs-it-found.md))
+drives the real, full stack through a real browser -- it needs
+everything from §7-8 already running (Docker infra, `uv run uvicorn`,
+`uv run arq`, and `pnpm --filter @coolblock/web dev`), plus a one-time
+`npx playwright install chromium` if this is the first Playwright run on
+the machine. `E2E_BASE_URL` overrides the default `http://localhost:3001`
+if your dev server landed on a different port (Next falls back
+automatically when 3000 is taken):
+
+```bash
+pnpm e2e
+```
+
+All 6 tests are expected to pass; the reconnect flow is covered
+separately at the API level (`test_solve_end_to_end.py`) rather than
+duplicated here.
+
 ## 11. Notebooks (the executed, evidence-carrying checkpoints)
 
 These aren't scratch files — each is committed *with its outputs*, so you

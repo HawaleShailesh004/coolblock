@@ -58,3 +58,9 @@ secrets.*
 
 # --- scripts/build_map_assets.sh's scratch dir (cleaned up on exit; ignored as a defense-in-depth) ---
 .map_assets_tmp/
+
+# --- Playwright (e2e/, playwright.config.ts) ---
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

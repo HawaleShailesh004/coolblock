@@ -9,10 +9,10 @@ import {
   compareBaselines,
   createPlan,
   createShareLink,
+  downloadScenarioExport,
   getScenario,
   parseConstraints,
   scenarioEventsUrl,
-  scenarioExportUrl,
   solvePlan,
   updatePlanBudgetAndConstraints,
   type LlmProvider,
@@ -130,6 +130,7 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
   const [baselineComparison, setBaselineComparison] = useState<Record<string, number> | null>(null);
   const [comparingBaselines, setComparingBaselines] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const subscriptionRef = useRef<EventStreamSubscription | null>(null);
 
@@ -279,6 +280,19 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
     setShareUrl(`${window.location.origin}/share/${link.token}`);
   }, [planId, version]);
 
+  const exportScenario = useCallback(
+    async (format: "geojson" | "csv") => {
+      if (!planId || version == null) return;
+      setExportError(null);
+      try {
+        await downloadScenarioExport(planId, version, format);
+      } catch (err) {
+        setExportError(err instanceof Error ? err.message : `failed to export ${format}`);
+      }
+    },
+    [planId, version],
+  );
+
   const runBaselineComparison = useCallback(async () => {
     if (!planId || version == null) return;
     setComparingBaselines(true);
@@ -373,6 +387,7 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
         </span>
         <input
           type="range"
+          aria-label="Budget"
           min={MIN_BUDGET_USD}
           max={MAX_BUDGET_USD}
           step={BUDGET_STEP_USD}
@@ -473,17 +488,24 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
 
       {status === "done" && planId && version != null && (
         <div style={{ display: "flex", gap: 8, fontSize: 11 }}>
-          <a href={scenarioExportUrl(planId, version, "geojson")} style={{ color: "var(--cool)" }}>
+          <button
+            onClick={() => exportScenario("geojson")}
+            style={{ background: "none", border: "none", color: "var(--cool)", cursor: "pointer", padding: 0, font: "inherit" }}
+          >
             Export GeoJSON
-          </a>
-          <a href={scenarioExportUrl(planId, version, "csv")} style={{ color: "var(--cool)" }}>
+          </button>
+          <button
+            onClick={() => exportScenario("csv")}
+            style={{ background: "none", border: "none", color: "var(--cool)", cursor: "pointer", padding: 0, font: "inherit" }}
+          >
             Export CSV
-          </a>
+          </button>
           <button onClick={share} style={{ background: "none", border: "none", color: "var(--cool)", cursor: "pointer", padding: 0, font: "inherit" }}>
             Share link
           </button>
         </div>
       )}
+      {exportError && <p style={{ fontSize: 11, color: "var(--warn)", marginTop: 4 }}>{exportError}</p>}
       {shareUrl && (
         <input
           readOnly

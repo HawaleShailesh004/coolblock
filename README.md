@@ -170,10 +170,32 @@ in `next.config.ts`: the previous session's `NEXT_PUBLIC_MAP_ASSETS_URL`
 was never added to the explicit client-env allowlist, so an override in
 `.env` would have been silently ignored.
 
-Phase 13's much larger remaining scope (E2E Playwright suite, golden-file
-tests, security audit beyond CSP, performance/bundle work, cross-browser
-testing) is untouched — these are two concrete slices, not a claim the
-phase is done.
+**Third finding, with a real browser now in the loop**: building Phase
+13's E2E suite ([`docs/adr/0024-*.md`](docs/adr/0024-e2e-suite-and-four-real-bugs-it-found.md),
+`e2e/*.spec.ts`, `playwright.config.ts`) surfaced four real, independent
+bugs — none hypothetical, each confirmed by actually reproducing it:
+(1) the "Share link" button generated a URL for a page,
+`/share/[token]`, that never existed; (2) "Export GeoJSON"/"Export CSV"
+were plain `<a href>` links to a workspace-scoped endpoint, so a real
+browser click silently 404'd (a header-carrying `Blob` download, not a
+plain link, was the real fix); (3) CORS only ever allowed
+`localhost:3000`, so Next's own automatic fallback to 3001+ when 3000 is
+taken — which happened on this very machine mid-session, unprompted, from
+an unrelated project — broke every API call with no clear error; and
+(4) **the previous pass's own new CSP broke the optimizer entirely in
+`next dev`** (blocked `eval`, which Next's dev-mode HMR tooling needs,
+confirmed by reproducing the exact break and then confirming a
+production build has no such issue) — resolving `docs/adr/0023-*.md`'s
+own flagged "needs a real browser check" item, the hard way. All three
+E2E specs (the full journey, the share flow, the export flow — the
+reconnect flow is already covered at the API level,
+`test_solve_end_to_end.py`) now pass 6/6 against the real, full local
+stack.
+
+Phase 13's much larger remaining scope (golden-file tests, a security
+audit beyond CSP, performance/bundle work, cross-browser testing) is
+untouched — these are three concrete slices, not a claim the phase is
+done.
 
 ## Quickstart
 

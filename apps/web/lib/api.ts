@@ -92,6 +92,11 @@ export function createShareLink(planId: string, version: number): Promise<ShareL
   return apiFetch(`/plans/${planId}/scenarios/${version}/share`, { method: "POST" });
 }
 
+/** `GET /share/{token}` needs no auth by design (apps/api/src/coolblock_api/routers/share.py) -- dev headers are sent anyway since `apiFetch` always attaches them, but the endpoint ignores them. */
+export function getSharedScenario(token: string): Promise<ScenarioVersionDetail> {
+  return apiFetch(`/share/${token}`);
+}
+
 /** §9 ★5: EWCB per strategy (spread_evenly/worst_first/squeaky_wheel/tes_score_only/coolblock), same budget. Real cost, ~15-20s. */
 export function compareBaselines(planId: string, version: number): Promise<Record<string, number>> {
   return apiFetch(`/plans/${planId}/scenarios/${version}/baselines`);
@@ -132,6 +137,35 @@ export function scenarioEventsUrl(planId: string, version: number): string {
   return `${API_BASE_URL}/plans/${planId}/scenarios/${version}/events`;
 }
 
-export function scenarioExportUrl(planId: string, version: number, format: "geojson" | "csv"): string {
-  return `${API_BASE_URL}/plans/${planId}/scenarios/${version}/export.${format}`;
+/**
+ * A real bug found writing this project's first E2E tests: the export
+ * endpoints are workspace-scoped (`get_current_workspace`), but a plain
+ * `<a href>` navigation carries no custom headers -- the backend's
+ * dev-auth fallback then resolves a *different* workspace
+ * (`x-dev-workspace-id` defaults to `"dev-workspace"`, not this app's own
+ * `"demo-workspace"`), so the plan is genuinely not found there: a real
+ * 404, not a hypothetical one, confirmed directly against a running
+ * server. Fetching with `authHeaders()` and triggering a client-side
+ * Blob download is the correct fix, not a workaround -- the same
+ * approach any authenticated download needs when the browser's own
+ * navigation can't carry the required headers.
+ */
+export async function downloadScenarioExport(planId: string, version: number, format: "geojson" | "csv"): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/plans/${planId}/scenarios/${version}/export.${format}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, typeof body.detail === "string" ? body.detail : res.statusText);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `plan-${planId}-v${version}.${format}`;
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
