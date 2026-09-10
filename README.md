@@ -197,6 +197,34 @@ audit beyond CSP, performance/bundle work, cross-browser testing) is
 untouched — these are three concrete slices, not a claim the phase is
 done.
 
+**A fifth finding**: the user reported the live app's map "looks
+broken." A real screenshot (via a standalone `playwright` script, not an
+MCP connector) showed why — buildings rendered at near-opaque fill, and
+with 2,844 densely-packed buildings at the default pitched camera, their
+solid extruded walls visually hid almost the entire heat surface
+underneath, directly undermining §9 ★1's own "the surface glows beneath
+the 3D block." Every tile request had actually succeeded — confirmed via
+network capture — this was a rendering-value regression, not a broken
+pipeline. Fixed by halving building opacity across every honesty-rail
+tier; confirmed with a direct before/after screenshot comparison. See
+[`docs/adr/0025-*.md`](docs/adr/0025-building-opacity-was-hiding-the-heat-surface.md).
+
+**Phase 12 (started)**: the marketing site. `apps/web/app/page.tsx` was
+still the literal Phase 0 placeholder through every phase since — replaced
+with a real, static-generated one-pager using the "Field Instrument"
+light/editorial tokens the design system already declared: a hero image
+that is a genuine screenshot of the live product (not a mockup), four
+real stats, the five real cited papers with real DOI links, and an
+honest disclosure section — no fabricated claim anywhere on the page.
+Also fixed a real, silent gap found in the same pass: `--font-display`/`--font-ui`/`--font-mono`
+were plain fallback font-family stacks that were never actually loaded —
+every page in this app, including `/map`, has been silently rendering in
+system fallback fonts (Georgia/system-ui), not the design system's
+specified faces, this entire build. Fixed via `next/font/google`
+(self-hosted, no new CSP exception needed). The full §9.7 spec (a
+scroll-driven R3F 3D hero, a live demo embed) remains open — see
+[`docs/adr/0026-*.md`](docs/adr/0026-marketing-site-real-one-pager.md).
+
 ## Quickstart
 
 Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/),
