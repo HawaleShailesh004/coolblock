@@ -221,9 +221,25 @@ were plain fallback font-family stacks that were never actually loaded —
 every page in this app, including `/map`, has been silently rendering in
 system fallback fonts (Georgia/system-ui), not the design system's
 specified faces, this entire build. Fixed via `next/font/google`
-(self-hosted, no new CSP exception needed). The full §9.7 spec (a
-scroll-driven R3F 3D hero, a live demo embed) remains open — see
+(self-hosted, no new CSP exception needed). See
 [`docs/adr/0026-*.md`](docs/adr/0026-marketing-site-real-one-pager.md).
+
+**Phase 12, §9.7 completed**: the scroll-driven 3D hero is real
+three.js/@react-three/fiber (`apps/web/app/HeatBlockScene.tsx`), a
+deterministic building grid over a ground plane that transitions between
+this project's own real thermal-ramp tokens as you scroll — lazily
+hydrated below the headline (confirmed the homepage bundle stayed at
+7.17 kB / 116 kB First Load JS), holding at a fixed frame under
+`prefers-reduced-motion` or a detected low-end device, per §9.7's own
+requirement. Verified with real screenshots at multiple scroll positions,
+not assumed from the code. Found and fixed a real crash along the way (a
+stale `.next` RSC cache after the new three.js dependencies landed,
+throwing a real error that tripped this app's own `global-error.tsx`) —
+and found, then deliberately reversed, a live-demo iframe embed of `/map`
+after it produced a real, embed-specific hydration mismatch plus a real
+backend-cost/GPU-contention concern; the live demo is a real screenshot
+and a direct link instead. See
+[`docs/adr/0027-*.md`](docs/adr/0027-scroll-driven-3d-hero.md).
 
 ## Quickstart
 

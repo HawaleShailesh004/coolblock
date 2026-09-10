@@ -27,10 +27,17 @@ const LOCAL_ORIGINS = [API_URL, TITILER_URL, MINIO_URL].join(" ");
 // hydration/RSC bootstrap scripts inline, and a nonce-based strict CSP
 // (Next's documented alternative) needs per-request middleware this pass
 // didn't add. Every other directive here is load-bearing: no external
-// script origins, no plugins/embeds, no framing (clickjacking), and
-// connect-src is scoped to exactly the three local services above --
-// worker-src/img-src allow 'blob:' for maplibre-gl's own web worker and
-// canvas tile decoding.
+// script origins, no plugins/embeds, and connect-src is scoped to
+// exactly the three local services above -- worker-src/img-src allow
+// 'blob:' for maplibre-gl's own web worker and canvas tile decoding.
+//
+// `frame-ancestors 'none'`: nothing in this app frames another route of
+// itself (docs/adr/0027-*.md briefly tried embedding /map in an iframe on
+// the marketing homepage, found a real hydration-mismatch quirk specific
+// to that embedded context plus the real backend cost of a second full
+// app instance loading per marketing pageview, and dropped it in favor
+// of a screenshot + a direct link -- so the strict, no-framing-at-all
+// policy is correct again, not merely the original default).
 //
 // **`'unsafe-eval'` is added in development only, and this is not a
 // guess** -- confirmed by actually reproducing the break: with a strict

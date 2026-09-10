@@ -1,16 +1,27 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ScrollHeatHero } from "./ScrollHeatHero";
 
 /**
- * §9.7 / Phase 12: the marketing site. The plan's own full spec is a
- * scroll-driven R3F hero (a 3D block heating/cooling as you scroll) --
- * not built here; this is a real, static-generated one-pager using the
- * same "Field Instrument" tokens (§8.1: light/editorial for marketing,
- * dark/technical for the app) and only real, already-computed numbers
- * (docs/METHODOLOGY.md, docs/DATA-SOURCES.md, data/cache/literature's
- * five real cited papers) -- no fabricated stats, matching the rest of
- * this project's honesty rail. The hero image is a real screenshot of
- * the live product (apps/web/public/hero-map.png), not a mockup.
+ * §9.7 / Phase 12: the marketing site -- "Field Instrument" tokens (§8.1:
+ * light/editorial for marketing, dark/technical for the app), only real,
+ * already-computed numbers (docs/METHODOLOGY.md, docs/DATA-SOURCES.md,
+ * data/cache/literature's five real cited papers), and no fabricated stat
+ * anywhere, matching the rest of this project's honesty rail.
+ *
+ * The scroll-driven 3D hero (ScrollHeatHero/HeatBlockScene) is real
+ * three.js/@react-three/fiber, not a video or a CSS trick -- lazily
+ * hydrated below the headline, and it holds at a fixed frame instead of
+ * animating on scroll under `prefers-reduced-motion` or on a detected
+ * low-end device (no WebGL, ≤2 cores), per §9.7's own requirement.
+ *
+ * The "live demo" section links to the real running app rather than
+ * embedding it in an iframe -- an iframe was tried and dropped
+ * (docs/adr/0027-*.md): a real hydration-mismatch quirk specific to the
+ * embedded context, plus a full second copy of the app (and its real
+ * backend cost) loading on every marketing pageview, for marginal value
+ * over a real screenshot (apps/web/public/hero-map.png) and a direct
+ * link.
  */
 
 const CITATIONS: { title: string; venue: string; usedFor: string; href: string | null }[] = [
@@ -108,18 +119,36 @@ export default function HomePage() {
             See the evidence
           </a>
         </div>
+      </section>
 
-        <div className="mt-12 overflow-hidden rounded-lg border border-ink-0/10 bg-bg-0">
-          <Image
-            src="/hero-map.png"
-            alt="CoolBlock's live 3D map of Edison-Eastlake, Phoenix, with the modeled heat surface glowing beneath semi-transparent extruded buildings"
-            width={1080}
-            height={1033}
-            className="h-auto w-full"
-            priority
-          />
+      {/* Scroll-driven 3D hero: heats into the problem, cools into the solution (§9.7) */}
+      <ScrollHeatHero />
+
+      {/* Live demo */}
+      <section id="live-demo" className="border-y border-ink-0/10 bg-paper-1">
+        <div className="mx-auto max-w-5xl px-6 py-20">
+          <h2 className="font-display text-3xl text-ink-0">This is the real, live product</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-[1.55] text-ink-0/70">
+            Not a video, not a prototype — click through and set a budget yourself. Sites land one
+            at a time as the real optimizer runs.
+          </p>
+          <div className="mt-8 overflow-hidden rounded-lg border border-ink-0/10 bg-bg-0">
+            <Image
+              src="/hero-map.png"
+              alt="CoolBlock's live 3D map of Edison-Eastlake, Phoenix, with the modeled heat surface glowing beneath semi-transparent extruded buildings"
+              width={1080}
+              height={1033}
+              className="h-auto w-full"
+            />
+          </div>
+          <p className="mt-2 font-mono text-xs text-ink-0/40">A real screenshot of the live product, not a mockup.</p>
+          <Link
+            href="/map"
+            className="mt-6 inline-block rounded-md bg-ink-0 px-5 py-3 text-sm font-medium text-paper-0 transition-opacity hover:opacity-85"
+          >
+            Open the live instrument →
+          </Link>
         </div>
-        <p className="mt-2 font-mono text-xs text-ink-0/40">A real screenshot of the live product, not a mockup.</p>
       </section>
 
       {/* Stats */}
