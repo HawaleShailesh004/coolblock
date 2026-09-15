@@ -29,6 +29,7 @@ from engine.ingest import d04_osm, d06_parcels, d07b_tiger_bg
 from engine.ingest.manifest import version_dir
 from engine.optimize.celf import solve
 from engine.optimize.objective import build_coverage_objective
+from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY, candidate_pool
 from engine.surface.candidates import generate_candidates
 from engine.surface.heights import estimate_height_m as _estimate_height_m
 from engine.surface.impervious_candidates import generate_impervious_candidates
@@ -150,14 +151,20 @@ def export_optimizer_solution(budget_usd: float = DEFAULT_OPTIMIZER_BUDGET_USD) 
     budget, so this re-solves fresh from `_build_scored_candidates()`
     rather than reading `candidates.geojson` back in -- one source of
     truth for the scored candidate set, not two files that could drift
-    out of sync if only one is re-exported."""
+    out of sync if only one is re-exported.
+
+    Solved on the default candidate pool (trees on public land,
+    `engine.optimize.programs`, docs/adr/0027-*.md) -- the same plan a
+    visitor gets from the live optimizer's defaults, so this layer and the
+    app never disagree about what "CoolBlock's plan" is."""
     combined, _calibration = _build_scored_candidates()
-    objective = build_coverage_objective(combined)
-    costs = combined["total_cost_usd"].to_numpy()
+    pool = candidate_pool(combined, DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY)
+    objective = build_coverage_objective(pool)
+    costs = pool["total_cost_usd"].to_numpy()
 
     picks = list(solve(objective, costs, budget_usd))
     indices = [p.candidate_index for p in picks]
-    selected = combined.iloc[indices].copy()
+    selected = pool.iloc[indices].copy()
     selected["solve_rank"] = range(1, len(indices) + 1)
     selected["marginal_gain_ewcb"] = [p.marginal_gain for p in picks]
     selected["cumulative_ewcb"] = [p.cumulative_value for p in picks]

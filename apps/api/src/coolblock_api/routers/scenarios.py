@@ -28,6 +28,7 @@ import groq
 from engine.config import load_neighborhood_config
 from engine.narrate.memo import build_memo_payload, generate_council_memo
 from engine.optimize.plan_service import run_baseline_comparison
+from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from geoalchemy2.shape import to_shape
@@ -215,7 +216,21 @@ async def compare_baselines(
     while it computes; rate-limited (5/min/workspace) for the same reason
     the solve endpoint is."""
     scenario = _get_scenario_or_404(db, workspace, plan_id, version)
-    return await asyncio.to_thread(run_baseline_comparison, scenario.plan.budget_usd)
+    program, public_land_only = _candidate_pool_of(scenario.plan)
+    return await asyncio.to_thread(
+        run_baseline_comparison, scenario.plan.budget_usd, program=program, public_land_only=public_land_only
+    )
+
+
+def _candidate_pool_of(plan: Plan) -> tuple[str, bool]:
+    """The same pool the plan's own solve used (plans.py's `solve_plan`),
+    so a baseline is never allowed to pick from candidates the plan
+    couldn't (docs/adr/0027-*.md)."""
+    constraints = plan.constraints or {}
+    return (
+        constraints.get("program", DEFAULT_PROGRAM),
+        constraints.get("public_land_only", DEFAULT_PUBLIC_LAND_ONLY),
+    )
 
 
 @router.post("/{version}/memo", response_model=MemoOut)
@@ -264,9 +279,12 @@ async def generate_memo(
         for s in scenario.sites
     ]
 
+    program, public_land_only = _candidate_pool_of(plan)
     baseline_comparison = None
     if include_baselines:
-        baseline_comparison = await asyncio.to_thread(run_baseline_comparison, plan.budget_usd)
+        baseline_comparison = await asyncio.to_thread(
+            run_baseline_comparison, plan.budget_usd, program=program, public_land_only=public_land_only
+        )
 
     payload = build_memo_payload(
         neighborhood_name=cfg.name,
@@ -279,6 +297,8 @@ async def generate_memo(
         total_cost_usd=scenario.cost_usd or 0.0,
         total_ewcb=scenario.objective_value_ewcb or 0.0,
         baseline_comparison=baseline_comparison,
+        program=program,
+        public_land_only=public_land_only,
     )
     try:
         result = await asyncio.to_thread(generate_council_memo, payload, provider=provider)

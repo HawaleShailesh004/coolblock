@@ -106,6 +106,12 @@ You will be given a JSON payload of real, already-computed data. Follow these ru
 """
 
 
+PROGRAM_DESCRIPTIONS = {
+    "trees": "street trees and park tree clusters (shade and cooling for people outdoors)",
+    "cool_roofs": "reflective cool-roof coatings (lower roof surface temperature for the people inside each building)",
+}
+
+
 def load_citations() -> dict[str, list[dict[str, Any]]]:
     if not CITATIONS_PATH.exists():
         return {"papers": [], "city_plans": []}
@@ -125,6 +131,8 @@ def build_memo_payload(
     total_cost_usd: float,
     total_ewcb: float,
     baseline_comparison: dict[str, float] | None = None,
+    program: str | None = None,
+    public_land_only: bool | None = None,
 ) -> dict[str, Any]:
     """Assembles the exact JSON the model sees, computing every derived
     statistic (per-site average, % of budget used, per-intervention-type
@@ -155,6 +163,13 @@ def build_memo_payload(
         "methodology": METHODOLOGY_FACTS,
         "citations": load_citations(),
     }
+    if program is not None:
+        # Which candidate pool this plan was solved on (engine.optimize.programs,
+        # docs/adr/0027-*.md) -- so the memo describes a tree plan as trees and a
+        # cool-roof plan as roofs, instead of guessing from intervention_type_counts.
+        payload["program"] = PROGRAM_DESCRIPTIONS.get(program, program)
+    if public_land_only is not None:
+        payload["candidates_limited_to_public_land"] = public_land_only
 
     if baseline_comparison:
         others = {k: v for k, v in baseline_comparison.items() if k != "coolblock"}

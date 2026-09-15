@@ -33,8 +33,13 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
 - **6**: the optimizer — CELF lazy greedy (E2, the production solver),
   exact MILP via HiGHS to measure the approximation ratio, a constrained
   greedy for real side constraints (E3), the efficient frontier (E4), and
-  the five-baseline comparison (E5) — **CoolBlock beats TES-score-only by
-  4.6-14x** on Equity-Weighted Cooling Benefit at equal budget.
+  the five-baseline comparison (E5) — on the default plan, **trees on
+  public land, CoolBlock delivers 1.4–3.0× the Equity-Weighted Cooling
+  Benefit of the best alternative (Tree Equity Score ranking)** at equal
+  budget. (An earlier 4.6–14× figure came from ranking trees and cool roofs
+  together, which always picked 100% cool roofs; trees and cool roofs are
+  now separate programs — see
+  [`docs/adr/0027-*.md`](docs/adr/0027-programs-trees-and-cool-roofs-never-ranked-together.md).)
 
 **7**: a real FastAPI service — Postgres-backed plans and scenario
 versions, Clerk-shaped auth with a documented local-dev fallback (no

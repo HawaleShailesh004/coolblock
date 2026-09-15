@@ -267,8 +267,10 @@ the ARQ worker), not just the static-file layers above.
 9. **After a solve completes, "Beats the alternatives?"** — click
    **Compare vs. baselines** (takes ~15-20s, real compute: it re-samples
    the actual downscaled LST raster). A five-bar chart appears; CoolBlock
-   should be the longest bar by a wide margin (measured 4.6-14x over
-   TES-score-only across budgets — see `docs/METHODOLOGY.md`).
+   should be the longest bar. On the default plan (trees on public land)
+   the measured lead over TES-score-only is 1.4–3.0× across budgets — at
+   $50,000 it's the narrowest (1.4×), so a modest gap there is correct, not
+   a regression (`docs/METHODOLOGY.md`, `docs/adr/0027-*.md`).
 10. **"Council memo"** — requires either `ANTHROPIC_API_KEY` (Claude,
     higher quality, ~15-60s) or `GROQ_API_KEY` (Groq, `openai/gpt-oss-120b`,
     much faster, ~3-8s) set in `.env` with a positive credit balance; the

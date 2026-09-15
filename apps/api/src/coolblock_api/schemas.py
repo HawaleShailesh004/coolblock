@@ -18,9 +18,15 @@ from coolblock_api.db.models import ScenarioStatus
 class ConstraintsIn(BaseModel):
     """The E3 side-constraint surface (§6.5 E3), mirroring
     `engine.optimize.plan_service.SolveParams` minus `budget_usd` (which
-    lives on the plan itself, not nested inside its constraints)."""
+    lives on the plan itself, not nested inside its constraints).
 
-    public_land_only: bool = False
+    `program` and `public_land_only` default to a trees-on-public-land plan
+    -- what an urban-forestry heat grant can actually be spent on, and the
+    only default that answers the product's own question about trees
+    (docs/adr/0027-*.md; engine.optimize.programs)."""
+
+    program: Literal["trees", "cool_roofs"] = "trees"
+    public_land_only: bool = True
     max_sites_per_zone: int | None = None
     min_spend_per_zone_usd: float | None = None
     annual_maintenance_cap_usd: float | None = None

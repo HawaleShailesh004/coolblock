@@ -367,11 +367,22 @@ export interface components {
          * @description The E3 side-constraint surface (§6.5 E3), mirroring
          *     `engine.optimize.plan_service.SolveParams` minus `budget_usd` (which
          *     lives on the plan itself, not nested inside its constraints).
+         *
+         *     `program` and `public_land_only` default to a trees-on-public-land plan
+         *     -- what an urban-forestry heat grant can actually be spent on, and the
+         *     only default that answers the product's own question about trees
+         *     (docs/adr/0027-*.md; engine.optimize.programs).
          */
         ConstraintsIn: {
             /**
+             * Program
+             * @default trees
+             * @enum {string}
+             */
+            program: "trees" | "cool_roofs";
+            /**
              * Public Land Only
-             * @default false
+             * @default true
              */
             public_land_only: boolean;
             /** Max Sites Per Zone */

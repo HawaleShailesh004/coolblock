@@ -15,6 +15,7 @@ import anthropic
 import groq
 from engine.narrate.constraints_nl import ConstraintParseError, parse_constraints
 from engine.optimize.plan_service import SolveParams
+from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -192,7 +193,8 @@ async def solve_plan(
     constraints = plan.constraints or {}
     params = SolveParams(
         budget_usd=plan.budget_usd,
-        public_land_only=constraints.get("public_land_only", False),
+        program=constraints.get("program", DEFAULT_PROGRAM),
+        public_land_only=constraints.get("public_land_only", DEFAULT_PUBLIC_LAND_ONLY),
         max_sites_per_zone=constraints.get("max_sites_per_zone"),
         min_spend_per_zone_usd=constraints.get("min_spend_per_zone_usd"),
         annual_maintenance_cap_usd=constraints.get("annual_maintenance_cap_usd"),

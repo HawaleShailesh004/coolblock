@@ -99,9 +99,25 @@ function siteToLiveSolutionSite(s: SiteEventData): LiveSolutionSite {
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const number0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
+type Program = "trees" | "cool_roofs";
+
+const PROGRAM_OPTIONS: { value: Program; label: string; hint: string }[] = [
+  { value: "trees", label: "Trees", hint: "Street trees and park tree clusters: shade and cooling for people outside." },
+  {
+    value: "cool_roofs",
+    label: "Cool roofs",
+    hint: "Reflective roof coatings: a cooler home for the people inside. Private roofs need the owner's consent.",
+  },
+];
+
 export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (layer: Layer | null) => void }) {
   const [budgetUsd, setBudgetUsd] = useState(DEFAULT_BUDGET_USD);
-  const [publicLandOnly, setPublicLandOnly] = useState(false);
+  // Trees on public land by default: what a heat-mitigation tree grant can
+  // actually be spent on. Trees and cool roofs are never ranked against each
+  // other -- their cooling isn't the same physical quantity (docs/adr/0027-*.md).
+  // Mirrors ConstraintsIn's defaults in apps/api/src/coolblock_api/schemas.py.
+  const [program, setProgram] = useState<Program>("trees");
+  const [publicLandOnly, setPublicLandOnly] = useState(true);
   const [maxSitesPerZone, setMaxSitesPerZone] = useState<number | "">("");
   const [minSpendPerZoneUsd, setMinSpendPerZoneUsd] = useState<number | "">("");
   const [annualMaintenanceCapUsd, setAnnualMaintenanceCapUsd] = useState<number | "">("");
@@ -196,6 +212,7 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
     setBaselineError(null);
 
     const constraints = {
+      program,
       public_land_only: publicLandOnly,
       max_sites_per_zone: maxSitesPerZone === "" ? null : maxSitesPerZone,
       min_spend_per_zone_usd: minSpendPerZoneUsd === "" ? null : minSpendPerZoneUsd,
@@ -245,6 +262,7 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
   }, [
     planId,
     budgetUsd,
+    program,
     publicLandOnly,
     maxSitesPerZone,
     minSpendPerZoneUsd,
@@ -379,6 +397,51 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
           </p>
         ))}
       </div>
+
+      <fieldset style={{ border: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+        <legend style={{ opacity: 0.7, marginBottom: 6 }}>What are you funding?</legend>
+        <div role="radiogroup" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {PROGRAM_OPTIONS.map((opt) => {
+            const selected = program === opt.value;
+            return (
+              <label
+                key={opt.value}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  border: `1px solid ${selected ? "var(--cool)" : "var(--bg-2)"}`,
+                  background: selected ? "rgba(76,201,192,0.12)" : "transparent",
+                  cursor: isBusy ? "default" : "pointer",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="program"
+                  value={opt.value}
+                  checked={selected}
+                  disabled={isBusy}
+                  onChange={() => {
+                    setProgram(opt.value);
+                    // A city can plant trees on its own land; a cool-roof program
+                    // is mostly private homes, so don't silently keep a filter that
+                    // would leave almost nothing to choose from.
+                    setPublicLandOnly(opt.value === "trees");
+                  }}
+                  style={{ margin: 0 }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+        <span style={{ fontSize: 11, opacity: 0.6, lineHeight: 1.4 }}>
+          {PROGRAM_OPTIONS.find((o) => o.value === program)?.hint}
+        </span>
+      </fieldset>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
         <span style={{ display: "flex", justifyContent: "space-between" }}>

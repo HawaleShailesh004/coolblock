@@ -725,9 +725,31 @@ construction, not a hand-picked metric:
 | **CoolBlock** | **57,064** | **223,852** |
 
 CoolBlock beats TES-score-only — the best existing tool — by **4.6× at
-$20k and 14.0× at $100k**, and beats every other baseline by a much wider
-margin. This clears the plan's own bar ("if CoolBlock does not beat
-TES-score-only by a clear margin, we have not built anything") decisively.
+$20k and 14.0× at $100k** *on this mixed pool*, and beats every other
+baseline by a much wider margin.
+
+**Superseded as the headline result (2026-09-15, `docs/adr/0027-*.md`).**
+The table above ranks trees and cool roofs against each other, and every
+CoolBlock plan in it is 100% cool roofs — the surface-vs-ambient ΔT
+mismatch disclosed under E1 below and in `docs/adr/0014-*.md`. Trees and
+cool roofs are now separate programs that are never ranked together
+(`engine/optimize/programs.py`), and the baselines run on exactly the pool
+the plan was solved on. Re-measured on real data (multiple = CoolBlock ÷
+the best alternative, which was TES-score-only in every row):
+
+| Pool | $20,000 | $50,000 | $100,000 |
+|---|---|---|---|
+| All types, mixed (the table above) | 4.6× | 7.2× | 14.0× |
+| Trees, any land | 7.9× (5 sites) | 3.3× (15 sites) | 3.1× (16 sites) |
+| **Trees, public land — the default** | **3.0×** (10 sites, 43 trees) | **1.4×** (9 sites, 115 trees) | **2.5×** (10 sites, 234 trees) |
+
+Equity-weighted cooling benefit behind those multiples, trees on public
+land: $20k — CoolBlock 3,496 vs TES-only 1,182; $50k — 11,359 vs 8,182
+(squeaky wheel 6,719 is close behind here); $100k — 17,734 vs 7,220.
+
+So the plan's bar still clears on trees alone — CoolBlock beats every
+baseline in every row — but the honest headline for the plan a city would
+actually run is **1.4–3.0×**, not 4.6–14×.
 
 **A genuinely informative, not just favorable, finding**: worst-first's
 value is *identical* at both budgets (2,650) — it doesn't improve with 5×

@@ -10,7 +10,7 @@ const SELECTED_COLOR: [number, number, number] = [255, 255, 255]; // paper1 -- r
 
 export const optimizerSelectionLayer: LayerRegistration<FeatureCollection> = {
   id: "optimizer-selection",
-  label: "CoolBlock's plan ($50k budget, CELF greedy)",
+  label: "CoolBlock's plan (trees on public land, $50k)",
   defaultVisible: false,
   loadData: async () => {
     const res = await fetch("/api/layers/optimizer_selection");

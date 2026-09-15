@@ -56,6 +56,7 @@ from engine.optimize.constraints import (
     constrained_greedy,
 )
 from engine.optimize.objective import build_coverage_objective
+from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY, candidate_pool
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -95,7 +96,10 @@ class SolveParams:
     safe to persist across re-exports; the id is."""
 
     budget_usd: float
-    public_land_only: bool = False
+    # Which pool of candidates this plan ranks, and whether that pool is
+    # limited to public land -- see engine.optimize.programs (docs/adr/0027-*.md).
+    program: str = DEFAULT_PROGRAM
+    public_land_only: bool = DEFAULT_PUBLIC_LAND_ONLY
     max_sites_per_zone: int | None = None
     min_spend_per_zone_usd: float | None = None
     annual_maintenance_cap_usd: float | None = None
@@ -105,10 +109,11 @@ class SolveParams:
     def needs_constrained_solver(self) -> bool:
         """True iff any E3 side constraint beyond the plain budget cap is
         active -- CELF's lazy heap (E2) is only valid without these (see
-        `engine.optimize.constraints`'s module docstring)."""
+        `engine.optimize.constraints`'s module docstring). `program` and
+        `public_land_only` are not side constraints: they shrink the pool
+        before solving (`engine.optimize.programs.candidate_pool`)."""
         return bool(
-            self.public_land_only
-            or self.max_sites_per_zone is not None
+            self.max_sites_per_zone is not None
             or self.min_spend_per_zone_usd is not None
             or self.annual_maintenance_cap_usd is not None
             or self.mandatory_include_ids
@@ -174,8 +179,8 @@ def stream_solve(
     -- what lets `engine/tests/test_plan_service.py` exercise this against
     a small synthetic universe without touching the real cached export."""
     yield StageEvent("loading_candidates", "Loading the cached, pre-scored candidate universe")
-    universe = candidates if candidates is not None else load_candidate_universe()
-    universe = universe.reset_index(drop=True)
+    full_universe = candidates if candidates is not None else load_candidate_universe()
+    universe = candidate_pool(full_universe, params.program, params.public_land_only)
     universe_wgs84 = universe.to_crs(epsg=4326)
 
     yield StageEvent("scoring_impact", "Building the equity-weighted coverage objective (D4)")
@@ -185,6 +190,14 @@ def stream_solve(
     id_to_index = {str(cid): i for i, cid in enumerate(universe["candidate_id"])}
     mandatory_include = frozenset(id_to_index[c] for c in params.mandatory_include_ids if c in id_to_index)
     mandatory_exclude = frozenset(id_to_index[c] for c in params.mandatory_exclude_ids if c in id_to_index)
+    outside_pool = len(params.mandatory_include_ids) - len(mandatory_include)
+    if outside_pool:
+        # e.g. a "sites near the school" request (L1) that resolved to cool
+        # roofs while this plan funds trees -- said out loud, not dropped silently.
+        yield StageEvent(
+            "mandatory_outside_pool",
+            f"{outside_pool} required site(s) aren't eligible in this plan (wrong program or not public land) and were skipped",
+        )
 
     def emit(pick: Selection, rank: int) -> SiteEvent:
         row = universe.iloc[pick.candidate_index]
@@ -206,7 +219,6 @@ def stream_solve(
         yield StageEvent("solving", "Running the constrained greedy solver (E3 side constraints active)")
         needs_zones = params.max_sites_per_zone is not None or params.min_spend_per_zone_usd is not None
         zone_ids = assign_block_group(universe).tolist() if needs_zones else None
-        ownership = universe["ownership"].tolist() if params.public_land_only else None
         maintenance_costs = (
             annual_maintenance_cost(universe["intervention_type"].tolist(), universe["capacity"].to_numpy(dtype="float64"))
             if params.annual_maintenance_cap_usd is not None
@@ -217,13 +229,11 @@ def stream_solve(
             annual_maintenance_cap_usd=params.annual_maintenance_cap_usd,
             min_spend_per_zone_usd=params.min_spend_per_zone_usd,
             max_sites_per_zone=params.max_sites_per_zone,
-            public_land_only=params.public_land_only,
+            public_land_only=False,  # already applied to the pool by candidate_pool() above
             mandatory_include=mandatory_include,
             mandatory_exclude=mandatory_exclude,
         )
-        result = constrained_greedy(
-            objective, costs, config, zone_ids=zone_ids, ownership=ownership, maintenance_costs=maintenance_costs
-        )
+        result = constrained_greedy(objective, costs, config, zone_ids=zone_ids, maintenance_costs=maintenance_costs)
         for rank, pick in enumerate(result.picks, start=1):
             yield emit(pick, rank)
         n_sites, total_cost, total_value, solver_name = (
@@ -247,19 +257,25 @@ def stream_solve(
     yield DoneEvent(solver=solver_name, n_sites=n_sites, total_cost_usd=total_cost, total_ewcb=total_value)
 
 
-def run_baseline_comparison(budget_usd: float, candidates: gpd.GeoDataFrame | None = None) -> dict[str, float]:
+def run_baseline_comparison(
+    budget_usd: float,
+    candidates: gpd.GeoDataFrame | None = None,
+    program: str = DEFAULT_PROGRAM,
+    public_land_only: bool = DEFAULT_PUBLIC_LAND_ONLY,
+) -> dict[str, float]:
     """E5 (COOLBLOCK-BUILD-PLAN.md §6.5 E5), "the proof the product
     works," exposed as one callable the API can invoke on demand (§9 ★5):
     runs all five baseline strategies
     (`engine.optimize.baselines.run_all_baselines`) against the exact same
-    cached candidate universe and budget the live solve itself uses -- so
-    "same budget" in the comparison is literally the same number, not
-    independently re-entered. Slower than a warm solve (the `worst_first`
-    baseline samples the real downscaled LST raster, ~15-20s total,
-    measured) -- a deliberate, on-demand action the user triggers once to
-    see the comparison, not something run on every budget-slider drag."""
-    universe = candidates if candidates is not None else load_candidate_universe()
-    universe = universe.reset_index(drop=True)
+    candidate pool (program + public-land filter) and budget the plan
+    itself was solved on -- a baseline allowed to pick from a different
+    pool than the plan would not be a like-for-like comparison. Slower than
+    a warm solve (the `worst_first` baseline samples the real downscaled
+    LST raster, ~15-20s total, measured) -- a deliberate, on-demand action
+    the user triggers once to see the comparison, not something run on
+    every budget-slider drag."""
+    full_universe = candidates if candidates is not None else load_candidate_universe()
+    universe = candidate_pool(full_universe, program, public_land_only)
     objective = build_coverage_objective(universe)
     costs = universe["total_cost_usd"].to_numpy(dtype="float64")
     return run_all_baselines(universe, objective, costs, budget_usd)
