@@ -28,7 +28,15 @@ const PMTILES_URL =
 // (docs/adr/0022-*.md's offline-demo-mode fix).
 const MAP_ASSETS_URL = process.env.NEXT_PUBLIC_MAP_ASSETS_URL ?? "http://localhost:9000/coolblock-tiles";
 const TITILER_URL = process.env.NEXT_PUBLIC_TITILER_URL ?? "http://localhost:8090";
-const HEAT_SURFACE_COG_URL = "s3://coolblock-data/heat_surface_lst.tif";
+// TiTiler resolves an `s3://` URL via GDAL's /vsis3/ driver, which needs S3
+// credentials configured on the TiTiler service itself (MinIO locally) --
+// fine for a Docker Compose network, but it's one more credential a
+// deployed TiTiler would need. A plain https:// URL needs none (GDAL's
+// /vsicurl/ driver, any range-request-capable host), so a deploy that
+// already serves this same file as a static asset (docs/DEPLOYMENT.md) can
+// just point here instead -- override via NEXT_PUBLIC_HEAT_SURFACE_COG_URL.
+const HEAT_SURFACE_COG_URL =
+  process.env.NEXT_PUBLIC_HEAT_SURFACE_COG_URL ?? "s3://coolblock-data/heat_surface_lst.tif";
 
 // Not a deck.gl layer (see packages/map/src/heatSurface.ts) so it isn't part
 // of DEFAULT_LAYERS, but it shares the same toggle UI and visibility map.

@@ -114,3 +114,4 @@ class WorkerSettings:
     functions = [run_plan_solve]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     job_timeout = 300  # a full-neighborhood solve is measured at a few seconds (Phase 6 DoD: <8s) -- this is generous headroom, not a tuned budget
+    poll_delay = get_settings().arq_poll_delay_s  # see Settings.arq_poll_delay_s -- tuned up in production against a request-metered Redis

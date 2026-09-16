@@ -1,0 +1,34 @@
+# Keeps the Docker build context (apps/api/Dockerfile, built from the repo
+# root -- see that file's own header comment for why) small and fast to
+# transfer, both locally and on a host like Render that uploads this
+# context before building. None of this is needed to build or run the API
+# image; the Dockerfile COPYs in exactly engine/, apps/api/, config/,
+# data/derived/edison-eastlake/, and the three small public-data-only
+# data/cache/ sources named below (docs/adr/0032-*.md) explicitly.
+.git/
+node_modules/
+.venv/
+.next/
+.turbo/
+out/
+dist/
+build/
+apps/web/
+packages/
+e2e/
+notebooks/
+outputs/
+data/cache/*
+!data/cache/tiger_block_groups/
+!data/cache/census_acs5/
+!data/cache/tree_equity_score/
+data/derived/*/
+!data/derived/edison-eastlake/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+**/__pycache__/
+.playwright-mcp/
+test-results/
+playwright-report/
+*.log

@@ -75,6 +75,11 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_MAP_ASSETS_URL: process.env.NEXT_PUBLIC_MAP_ASSETS_URL,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_TITILER_URL: process.env.TITILER_URL,
+    // Not in the allowlist until now -- the same silent-override bug
+    // docs/adr/0023-*.md already found once for NEXT_PUBLIC_MAP_ASSETS_URL
+    // would otherwise repeat here for anyone deploying with a real heat
+    // surface COG URL (docs/DEPLOYMENT.md).
+    NEXT_PUBLIC_HEAT_SURFACE_COG_URL: process.env.NEXT_PUBLIC_HEAT_SURFACE_COG_URL,
   },
   async headers() {
     return [

@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://coolblock:coolblock@localhost:5433/coolblock"
     redis_url: str = "redis://localhost:6379/0"
 
+    # How often the ARQ worker polls Redis for new jobs (arq's own default
+    # is 0.5s). Local dev's own Redis container has no request quota, so
+    # the default is fine there; a free-tier hosted Redis (e.g. Upstash,
+    # billed/capped per command) can be exhausted by polling alone on an
+    # otherwise-idle worker. Override via ARQ_POLL_DELAY_S in production --
+    # this only delays how soon a *queued* job starts, not the solve
+    # itself (docs/adr/0028-*.md: ~2s either way), so a few extra seconds
+    # here is a real, bounded, and disclosed tradeoff, not a hidden one.
+    arq_poll_delay_s: float = 0.5
+
     # --- Auth (Clerk) -- see docs/adr/0016-*.md for the local-dev fallback
     # this settings shape enables. Blank in local/test, per ADR-0002's
     # posture for infra not yet provisioned. ---
