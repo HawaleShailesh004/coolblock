@@ -67,6 +67,12 @@ row below the best alternative was Tree Equity Score ranking.
 | Trees, any land | 7.9× — 5 sites | 3.3× — 15 sites | 3.1× — 16 sites |
 | **Trees, public land (new default)** | **3.0× — 10 sites, 43 trees** | **1.4× — 9 sites, 115 trees** | **2.5× — 10 sites, 234 trees** |
 
+*Re-measured 2026-09-16 (`docs/adr/0028-*.md`): with the exact solver
+replacing greedy on this pool, the default row is **3.4× — 4 sites, 46
+trees** / **1.4× — 6 sites, 114 trees** / **2.5× — 9 sites, 234 trees**.
+The numbers above are what greedy produced and are kept as the record of
+what this decision was made on.*
+
 So the advantage is real without the roof artifact — CoolBlock still beats
 every baseline on trees — but it is smaller, and it is honestly 1.4–3.0×
 on the plan a city would actually run, not 4.6–14×.

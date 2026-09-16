@@ -19,9 +19,13 @@ slider.
 Two solvers, selected automatically by which constraints are active,
 matching E2/E3 exactly rather than reimplementing either:
 
-- No side constraints beyond budget -> `engine.optimize.celf.solve`
-  (CELF, the production solver, `(1 - 1/sqrt(e))` guarantee -- see that
-  module's own docstring for the corrected citation).
+- No side constraints beyond budget -> `engine.optimize.best_plan.best_plan`,
+  which proves the optimal plan with the exact MILP
+  (`engine.optimize.exact`) when the pool is small enough to prove it
+  inside a wall-clock limit -- the default trees-on-public-land pool is --
+  and falls back to CELF (`engine.optimize.celf.solve`, the
+  `(1 - 1/sqrt(e))` guarantee) otherwise. `DoneEvent.solver` says which
+  one ran (docs/adr/0028-*.md).
 - Any E3 side constraint active -> `engine.optimize.constraints.constrained_greedy`,
   which (Phase 7 addition) now also yields picks in true commit order so
   the SSE stream can animate a constrained solve exactly like a CELF one.
@@ -49,7 +53,8 @@ import numpy as np
 
 from engine.config import load_neighborhood_config
 from engine.optimize.baselines import assign_block_group, run_all_baselines
-from engine.optimize.celf import Selection, solve
+from engine.optimize.best_plan import best_plan
+from engine.optimize.celf import Selection
 from engine.optimize.constraints import (
     ConstraintConfig,
     annual_maintenance_cost,
@@ -142,7 +147,7 @@ class SiteEvent:
 
 @dataclass(frozen=True)
 class DoneEvent:
-    solver: str  # "celf" | "constrained_greedy"
+    solver: str  # "exact_milp" | "celf" | "constrained_greedy"
     n_sites: int
     total_cost_usd: float
     total_ewcb: float
@@ -243,16 +248,11 @@ def stream_solve(
             "constrained_greedy",
         )
     else:
-        yield StageEvent("solving", "Running CELF cost-effective greedy (E2)")
-        last: Selection | None = None
-        n_sites = 0
-        for rank, pick in enumerate(solve(objective, costs, params.budget_usd), start=1):
+        yield StageEvent("solving", "Finding the best plan (exact solver, with CELF greedy as the fallback)")
+        plan = best_plan(objective, costs, params.budget_usd)
+        for rank, pick in enumerate(plan.picks, start=1):
             yield emit(pick, rank)
-            last = pick
-            n_sites = rank
-        total_cost = last.cumulative_cost_usd if last else 0.0
-        total_value = last.cumulative_value if last else 0.0
-        solver_name = "celf"
+        n_sites, total_cost, total_value, solver_name = len(plan.picks), plan.cost_usd, plan.value, plan.solver
 
     yield DoneEvent(solver=solver_name, n_sites=n_sites, total_cost_usd=total_cost, total_ewcb=total_value)
 

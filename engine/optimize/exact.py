@@ -63,13 +63,18 @@ def solve_exact(
     costs: FloatArray,
     budget_usd: float,
     time_limit_s: float = DEFAULT_TIME_LIMIT_S,
+    max_candidates: int = MAX_EXACT_CANDIDATES,
 ) -> ExactSolution:
     """Exact MILP solve. Raises if `objective` has more than
-    `MAX_EXACT_CANDIDATES` candidates -- callers must pass a reduced
-    instance (see `reduce_instance` below), not silently truncate here."""
+    `max_candidates` candidates -- callers must pass a reduced instance
+    (see `reduce_instance` below) or deliberately raise the cap (as
+    `engine.optimize.best_plan` does for pools it has measured), not
+    silently truncate here."""
     n = len(objective.influences)
-    if n > MAX_EXACT_CANDIDATES:
-        raise ValueError(f"{n} candidates exceeds MAX_EXACT_CANDIDATES ({MAX_EXACT_CANDIDATES}) -- reduce the instance first")
+    if n > max_candidates:
+        raise ValueError(
+            f"{n} candidates exceeds MAX_EXACT_CANDIDATES/max_candidates ({max_candidates}) -- reduce the instance first"
+        )
 
     h = highspy.Highs()
     h.silent()

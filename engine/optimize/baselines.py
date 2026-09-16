@@ -2,7 +2,8 @@
 product works." Solves the same candidate universe and budget with four
 naive/status-quo strategies, then compares each one's resulting
 `CoverageObjective` value (D4's EWCB, the same real metric CoolBlock
-itself maximizes) against CoolBlock's own CELF solve.
+itself maximizes) against the plan CoolBlock itself would hand out
+(`engine.optimize.best_plan` -- exact when it can be proven, CELF otherwise).
 
     "If CoolBlock does not beat TES-score-only by a clear margin, we have
     not built anything and we need to know that on day 5, not day 13."
@@ -50,7 +51,7 @@ import pandas as pd
 from engine.ingest import d07_census, d07b_tiger_bg, d10_tree_equity_score
 from engine.ingest.grid import get_canonical_grid
 from engine.ingest.manifest import version_dir
-from engine.optimize.celf import solve
+from engine.optimize.best_plan import best_plan
 from engine.optimize.objective import CoverageObjective
 from engine.thermal.downscale import run_downscaling
 
@@ -168,7 +169,10 @@ def squeaky_wheel(
 
 
 def coolblock(objective: CoverageObjective, costs: FloatArray, budget_usd: float) -> set[int]:
-    return {p.candidate_index for p in solve(objective, costs, budget_usd)}
+    # The same plan a user gets (engine.optimize.best_plan): exact when it can be
+    # proven quickly, CELF otherwise -- so the comparison never scores a weaker
+    # plan than the product actually hands out.
+    return {p.candidate_index for p in best_plan(objective, costs, budget_usd).picks}
 
 
 def run_all_baselines(

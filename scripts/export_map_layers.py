@@ -27,7 +27,7 @@ from engine.impact.ewcb import compute_ewcb
 from engine.impact.shade import run_shade_raytrace
 from engine.ingest import d04_osm, d06_parcels, d07b_tiger_bg
 from engine.ingest.manifest import version_dir
-from engine.optimize.celf import solve
+from engine.optimize.best_plan import best_plan
 from engine.optimize.objective import build_coverage_objective
 from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY, candidate_pool
 from engine.surface.candidates import generate_candidates
@@ -162,7 +162,7 @@ def export_optimizer_solution(budget_usd: float = DEFAULT_OPTIMIZER_BUDGET_USD) 
     objective = build_coverage_objective(pool)
     costs = pool["total_cost_usd"].to_numpy()
 
-    picks = list(solve(objective, costs, budget_usd))
+    picks = best_plan(objective, costs, budget_usd).picks
     indices = [p.candidate_index for p in picks]
     selected = pool.iloc[indices].copy()
     selected["solve_rank"] = range(1, len(indices) + 1)

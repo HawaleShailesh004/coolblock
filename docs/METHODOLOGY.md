@@ -549,6 +549,10 @@ D4's scope rather than a new gap.
 
 ### E2 — CELF lazy greedy
 
+*Since `docs/adr/0028-*.md`, CELF is the fallback rather than the solver
+that produces the default plan — see "the measured ratio" below for why
+and for what replaced it.*
+
 `engine/optimize/celf.py` implements Cost-Effective Lazy Forward
 selection (Leskovec et al. 2007): a max-heap keyed by each candidate's
 last-known marginal-gain-per-dollar, lazily re-evaluated (a candidate's
@@ -603,20 +607,45 @@ instances, and matches an independent recomputation via
 `CoverageObjective.value()` on the exact solver's own selected set.
 
 **Measured on the real candidate universe, at the plan's own reduced-
-instance size (300 candidates):**
+instance size (300 candidates, all intervention types):**
 
 | Budget | Greedy | Exact (proven optimal) | Ratio | Solve time |
 |---|---|---|---|---|
 | $20,000 | 57,064 | 57,317 | **99.6%** | 1.8s |
 | $100,000 | 223,844 | 224,101 | **99.9%** | 1.1s |
 
-CELF greedy reaches 99.6-99.9% of the *proven* exact optimum on this
-neighborhood's real data — far above both the plan's cited 0.63 figure
-and the knapsack-correct 0.393 worst-case bound (`docs/adr/0012-*.md`).
-Worst-case guarantees describe adversarial instances; this real
-instance's overlap structure is evidently far more favorable to greedy
-than the worst case, which is itself worth stating plainly rather than
-implying the worst-case bound is what was measured.
+On *that* instance CELF greedy reaches 99.6-99.9% of the proven exact
+optimum — far above both the plan's cited 0.63 figure and the
+knapsack-correct 0.393 worst-case bound (`docs/adr/0012-*.md`). Worst-case
+guarantees describe adversarial instances; that instance's overlap
+structure is evidently far more favorable to greedy than the worst case,
+which is worth stating plainly rather than implying the worst-case bound
+is what was measured.
+
+**That ratio does not carry over to the pool the product actually solves**
+(`docs/adr/0028-*.md`). Re-measured on the default pool — 773 tree sites
+on public land, the full pool, not a reduced instance:
+
+| Budget | CELF | Exact (proven optimal) | CELF / exact | Exact solve |
+|---|---|---|---|---|
+| $5,000 | 1,436 | 1,521 | 94.4% | 1.4s |
+| $20,000 | 3,496 | 4,057 | **86.2%** | 1.6s |
+| $50,000 | 11,359 | 11,775 | 96.5% | 1.9s |
+| $100,000 | 17,734 | 18,179 | 97.6% | 2.0s |
+| $200,000 | 23,010 | 23,021 | 99.95% | 1.8s |
+| $500,000 | 25,678 | 25,808 | 99.5% | 1.5s |
+
+A smaller, less redundant pool gives greedy fewer near-equivalent
+substitutes to fall back on, so its shortfall is larger — up to 16% at
+$20,000. Since HiGHS proves the optimum on this pool in about two
+seconds, **the exact solver, not CELF, now produces the plan the product
+hands out**: `engine/optimize/best_plan.py` runs both, uses the exact plan
+only when optimality is proven *and* it is at least as good as greedy's,
+and falls back to CELF (labeled `"celf"` in the solve's `DoneEvent`) for
+pools above `EXACT_POOL_LIMIT = 1,000` candidates. Every producer of a
+plan — the app, the baseline comparison, and the static map-layer export —
+goes through that one function, so the comparison chart never scores
+CoolBlock with a weaker solver than the product uses.
 
 **This measurement was originally a one-off notebook run; it is now real,
 reusable code** (§7.2.3's independent-solver verification, substituted
@@ -740,16 +769,20 @@ the best alternative, which was TES-score-only in every row):
 | Pool | $20,000 | $50,000 | $100,000 |
 |---|---|---|---|
 | All types, mixed (the table above) | 4.6× | 7.2× | 14.0× |
-| Trees, any land | 7.9× (5 sites) | 3.3× (15 sites) | 3.1× (16 sites) |
-| **Trees, public land — the default** | **3.0×** (10 sites, 43 trees) | **1.4×** (9 sites, 115 trees) | **2.5×** (10 sites, 234 trees) |
+| Trees, any land (CELF) | 7.9× (5 sites) | 3.3× (15 sites) | 3.1× (16 sites) |
+| **Trees, public land — the default** | **3.4×** (4 sites, 46 trees) | **1.4×** (6 sites, 114 trees) | **2.5×** (9 sites, 234 trees) |
 
 Equity-weighted cooling benefit behind those multiples, trees on public
-land: $20k — CoolBlock 3,496 vs TES-only 1,182; $50k — 11,359 vs 8,182
-(squeaky wheel 6,719 is close behind here); $100k — 17,734 vs 7,220.
+land: $20k — CoolBlock 4,057 vs TES-only 1,182; $50k — 11,775 vs 8,182
+(squeaky wheel 6,719 is close behind here); $100k — 18,179 vs 7,220.
+
+The default row is the **proven-optimal** plan (`docs/adr/0028-*.md`);
+re-measured 2026-09-16, after the exact solver replaced greedy on this
+pool. With greedy the same row read 3.0× / 1.4× / 2.5×.
 
 So the plan's bar still clears on trees alone — CoolBlock beats every
 baseline in every row — but the honest headline for the plan a city would
-actually run is **1.4–3.0×**, not 4.6–14×.
+actually run is **1.4–3.4×**, not 4.6–14×.
 
 **A genuinely informative, not just favorable, finding**: worst-first's
 value is *identical* at both budgets (2,650) — it doesn't improve with 5×

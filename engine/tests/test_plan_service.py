@@ -34,7 +34,7 @@ def universe() -> gpd.GeoDataFrame:
     return load_candidate_universe()
 
 
-def test_celf_path_emits_stages_then_sites_then_done(universe: gpd.GeoDataFrame) -> None:
+def test_unconstrained_path_emits_stages_then_sites_then_done(universe: gpd.GeoDataFrame) -> None:
     events = list(stream_solve(SolveParams(budget_usd=20_000.0), candidates=universe))
 
     stages = [e for e in events if isinstance(e, StageEvent)]
@@ -43,13 +43,13 @@ def test_celf_path_emits_stages_then_sites_then_done(universe: gpd.GeoDataFrame)
 
     assert [s.stage for s in stages] == ["loading_candidates", "scoring_impact", "solving"]
     assert len(done) == 1
-    assert done[0].solver == "celf"
+    assert done[0].solver == "exact_milp"  # the default pool is small enough to prove (docs/adr/0028-*.md)
     assert done[0].n_sites == len(sites)
     assert events.index(done[0]) == len(events) - 1  # done is always last
     assert [s.rank for s in sites] == list(range(1, len(sites) + 1))  # ranks arrive in order
 
 
-def test_celf_solve_never_exceeds_budget(universe: gpd.GeoDataFrame) -> None:
+def test_unconstrained_solve_never_exceeds_budget(universe: gpd.GeoDataFrame) -> None:
     budget = 15_000.0
     events = list(stream_solve(SolveParams(budget_usd=budget), candidates=universe))
     done = next(e for e in events if isinstance(e, DoneEvent))
@@ -62,15 +62,16 @@ def test_constrained_path_used_when_a_side_constraint_is_set(universe: gpd.GeoDa
     assert done.solver == "constrained_greedy"
 
 
-def test_default_plan_is_trees_on_public_land_and_still_uses_celf(universe: gpd.GeoDataFrame) -> None:
+def test_default_plan_is_trees_on_public_land_and_proven_optimal(universe: gpd.GeoDataFrame) -> None:
     """docs/adr/0027-*.md: the default plan answers the product's own
     question (trees), on land a city can plant without an owner's consent,
     and the public-land filter shrinks the pool instead of forcing the
-    non-lazy constrained solver."""
+    non-lazy constrained solver. docs/adr/0028-*.md: that pool is small
+    enough that the user gets the proven-optimal plan, not the greedy one."""
     events = list(stream_solve(SolveParams(budget_usd=20_000.0), candidates=universe))
     done = next(e for e in events if isinstance(e, DoneEvent))
     sites = [e for e in events if isinstance(e, SiteEvent)]
-    assert done.solver == "celf"
+    assert done.solver == "exact_milp"
     assert sites, "expected a real tree plan at $20,000"
     assert {s.intervention_type for s in sites} <= {"street_tree", "park_lot_tree_cluster"}
     assert all(s.properties["ownership"] in ("public_row", "public_parcel") for s in sites)

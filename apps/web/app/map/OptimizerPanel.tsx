@@ -99,6 +99,15 @@ function siteToLiveSolutionSite(s: SiteEventData): LiveSolutionSite {
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const number0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
+// What the solver name means to someone reading the result, not the class
+// name (docs/adr/0028-*.md). An unknown value falls through to itself rather
+// than to a friendly label that might be wrong.
+const SOLVER_LABELS: Record<string, string> = {
+  exact_milp: "proven optimal",
+  celf: "greedy, not proven optimal",
+  constrained_greedy: "greedy under your constraints",
+};
+
 type Program = "trees" | "cool_roofs";
 
 const PROGRAM_OPTIONS: { value: Program; label: string; hint: string }[] = [
@@ -544,7 +553,8 @@ export function OptimizerPanel({ onLiveLayerChange }: { onLiveLayerChange: (laye
         {status === "done" && summary && (
           <span style={{ color: "var(--ok)" }}>
             {summary.n_sites} sites &middot; {currency.format(summary.total_cost_usd)} &middot;{" "}
-            {number0.format(summary.total_ewcb)} EWCB ({summary.solver})
+            {number0.format(summary.total_ewcb)} EWCB &middot;{" "}
+            <span title={`solver: ${summary.solver}`}>{SOLVER_LABELS[summary.solver] ?? summary.solver}</span>
           </span>
         )}
       </div>

@@ -30,13 +30,15 @@ Locked target: **Edison-Eastlake, Phoenix, AZ** — see
   shade raytracing (C2), the albedo model (C3), dasymetric population and
   the Heat Vulnerability Index (D1/D2), exposure weighting and the
   Equity-Weighted Cooling Benefit objective (D3/D4).
-- **6**: the optimizer — CELF lazy greedy (E2, the production solver),
-  exact MILP via HiGHS to measure the approximation ratio, a constrained
-  greedy for real side constraints (E3), the efficient frontier (E4), and
-  the five-baseline comparison (E5) — on the default plan, **trees on
-  public land, CoolBlock delivers 1.4–3.0× the Equity-Weighted Cooling
-  Benefit of the best alternative (Tree Equity Score ranking)** at equal
-  budget. (An earlier 4.6–14× figure came from ranking trees and cool roofs
+- **6**: the optimizer — exact MILP via HiGHS, which proves the optimal
+  plan on the default pool in about two seconds and is what the product
+  hands out ([`docs/adr/0028-*.md`](docs/adr/0028-the-plan-we-hand-out-is-the-proven-optimal-one.md));
+  CELF lazy greedy (E2) as the fallback for pools too large to prove; a
+  constrained greedy for real side constraints (E3), the efficient
+  frontier (E4), and the five-baseline comparison (E5) — on the default
+  plan, **trees on public land, CoolBlock delivers 1.4–3.4× the
+  Equity-Weighted Cooling Benefit of the best alternative (Tree Equity
+  Score ranking)** at equal budget. (An earlier 4.6–14× figure came from ranking trees and cool roofs
   together, which always picked 100% cool roofs; trees and cool roofs are
   now separate programs — see
   [`docs/adr/0027-*.md`](docs/adr/0027-programs-trees-and-cool-roofs-never-ranked-together.md).)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import rasterio
@@ -24,8 +25,10 @@ OUT_DIR = REPO_ROOT / "data" / "derived" / "edison-eastlake"
 NODATA = -9999.0
 BUCKET = "coolblock-data"
 
+FloatArray = np.ndarray[Any, np.dtype[np.float64]]
 
-def _write_cog(data: np.ndarray, out_path: Path) -> None:
+
+def _write_cog(data: FloatArray, out_path: Path) -> None:
     grid = get_canonical_grid()
     filled = np.where(np.isfinite(data), data, NODATA).astype("float32")
 
@@ -43,7 +46,8 @@ def _write_cog(data: np.ndarray, out_path: Path) -> None:
     with rasterio.open(tmp_path, "w", **src_profile) as dst:
         dst.write(filled, 1)
 
-    cog_profile = cog_profiles.get("deflate")
+    # rio-cogeo ships no stubs; its profile dict is plain JSON-ish data.
+    cog_profile: dict[str, Any] = cog_profiles.get("deflate")  # type: ignore[no-untyped-call]
     with rasterio.open(tmp_path) as src:
         cog_translate(src, out_path, cog_profile, in_memory=False, quiet=True)
     tmp_path.unlink()

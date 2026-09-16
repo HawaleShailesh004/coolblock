@@ -65,7 +65,10 @@ async def test_solve_persists_sites_and_marks_scenario_done(client: TestClient) 
 
     detail = client.get(f"/plans/{plan['id']}/scenarios/{scenario['version_number']}", headers=auth_headers()).json()
     assert detail["status"] == "done"
-    assert detail["solver"] == "celf"
+    # Unconstrained solve: exact when HiGHS proves it inside the wall-clock
+    # limit (the usual case on the default pool), CELF when it does not --
+    # both are honest answers, and the API reports which one ran.
+    assert detail["solver"] in ("exact_milp", "celf")
     assert detail["cost_usd"] <= plan["budget_usd"] + 1e-6
     assert len(detail["sites"]) == result["n_sites"]
     assert detail["sites"][0]["rank"] == 1
