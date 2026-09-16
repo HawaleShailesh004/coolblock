@@ -1,0 +1,37 @@
+{
+  "bbox_wgs84": [
+    -112.0665,
+    33.446,
+    -112.045,
+    33.464
+  ],
+  "extra": {
+    "feature_count": 13,
+    "fields": [
+      "GEOID",
+      "city_name",
+      "total_pop",
+      "tes",
+      "tc_gap",
+      "tc_goal",
+      "nlcdcanopy",
+      "pctpoc",
+      "pctpov",
+      "temp",
+      "equity_ind"
+    ],
+    "score_vintage": "2020"
+  },
+  "fetched_at": "2026-09-04T20:27:59.862073+00:00",
+  "files": [
+    {
+      "bytes": 26426,
+      "path": "tes_block_groups.parquet",
+      "sha256": "d5af8c3f9eaf57bece12c397fef688c7210bd4762984deb747d5974d3b2936b4"
+    }
+  ],
+  "license": "Derived from American Forests Tree Equity Score methodology; this mirror is a third-party public republication (ArcGIS item 74fb41a4c31e4709858be6d7dcb4382f), not the official American Forests API -- see module docstring.",
+  "source": "tree_equity_score",
+  "url": "https://services1.arcgis.com/LPm07959azIAvFRD/arcgis/rest/services/Tree_Equity_Score_2020/FeatureServer/11/query",
+  "version": "2026-09-04"
+}

@@ -1,0 +1,31 @@
+{
+  "bbox_wgs84": null,
+  "extra": {
+    "acs_year": 2022,
+    "note": "poverty (B17001) and vehicle access (B08201) are tract-level, broadcast to block groups -- not published at block-group precision",
+    "row_count": 23,
+    "tracts": [
+      "113000",
+      "113100",
+      "113201",
+      "113202",
+      "113204",
+      "113301",
+      "113900",
+      "114000",
+      "114100"
+    ]
+  },
+  "fetched_at": "2026-09-04T20:36:19.778301+00:00",
+  "files": [
+    {
+      "bytes": 19081,
+      "path": "acs5_block_groups.parquet",
+      "sha256": "b437de82536fa148f7f78b5590847aaaa37a951e25d63b911a77fa14f1e1a7d6"
+    }
+  ],
+  "license": "Public domain -- US Census Bureau, ACS 5-year 2022",
+  "source": "census_acs5",
+  "url": "https://api.census.gov/data/2022/acs/acs5",
+  "version": "2026-09-04"
+}

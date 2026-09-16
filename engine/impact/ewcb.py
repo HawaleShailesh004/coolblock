@@ -67,12 +67,14 @@ vulnerability, and can legitimately go negative.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 
+from engine.config import REPO_ROOT, load_neighborhood_config
 from engine.equity.exposure import compute_exposure_multiplier
 from engine.equity.hvi import compute_hvi
 from engine.equity.population import redistribute_population
@@ -87,10 +89,52 @@ DESIGN_DAY_HOURS = 10.0  # matches engine.impact.shade's 09:00-18:00 window
 INFLUENCE_RADIUS_SIGMA_MULTIPLES = 3.0  # matches cooling_kernel.gaussian_patch's render radius
 
 
-def load_population_points() -> gpd.GeoDataFrame:
+# Matches `engine.optimize.plan_service.NEIGHBORHOOD_SLUG` and
+# `scripts/export_map_layers.py`'s `OUT_DIR` exactly -- deliberately a
+# literal, not `load_neighborhood_config().id` (that resolves to
+# "edison-eastlake-phoenix-az", a *different* string; see
+# `plan_service.py`'s own comment for why the directory name is a literal
+# for the scope-locked life of this build, not a second lookup that could
+# silently drift from the one every other cache path already uses).
+_NEIGHBORHOOD_SLUG = "edison-eastlake"
+
+
+def _cached_population_points_path() -> Path:
+    return REPO_ROOT / "data" / "derived" / _NEIGHBORHOOD_SLUG / "population_scored.geojson"
+
+
+def load_population_points(*, use_cache: bool = True) -> gpd.GeoDataFrame:
     """D1's residential buildings, each carrying its block group's HVI
     (D2) and its own exposure multiplier (D3) -- the population side of
-    the EWCB sum, built once and reused across every candidate."""
+    the EWCB sum, built once and reused across every candidate.
+
+    **Every solve calls this** (via `build_coverage_objective`, always with
+    default HVI weights -- the live app's per-indicator HVI weight sliders
+    only ever recompute the *map choropleth* client-side, never the
+    optimizer's own objective, so a cached default-weight result is always
+    the right answer here, not a stale approximation of a sometimes-different
+    one). Recomputing it from raw ingest cache on every request -- as this
+    function did until this cache-read was added -- means a request to
+    `/plans/{id}/solve` isn't actually only "a fast re-solve over an
+    already-scored candidate set" (`engine.optimize.plan_service`'s own
+    stated design): it also silently re-touches `data/cache/maricopa_parcels/`,
+    `data/cache/census_acs5/`, `data/cache/cdc_*/` and more -- real
+    per-person data (parcel owner names *and home addresses*, unlike the
+    already-scrubbed `owner_name`-only issue in `docs/adr/0030-*.md`) that
+    must never be assumed present on a deploy target, files that are also
+    considerably larger and more sensitive than anything already committed.
+
+    So: read the cached, precomputed result
+    (`scripts/export_map_layers.py`'s `export_population_scored()`) if it
+    exists, matching `plan_service.load_candidate_universe()`'s own
+    cache-first pattern exactly. Falls back to the full raw recompute if
+    the cache is missing (a fresh ingest, or `use_cache=False` to force a
+    real recompute, e.g. from the export script that regenerates the
+    cache itself)."""
+    cache_path = _cached_population_points_path()
+    if use_cache and cache_path.exists():
+        return gpd.read_file(cache_path).to_crs(epsg=load_neighborhood_config().target_epsg)
+
     buildings = redistribute_population()
     hvi = compute_hvi()[["geoid", "hvi"]]
 

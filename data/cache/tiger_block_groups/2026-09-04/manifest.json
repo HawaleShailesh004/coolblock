@@ -1,0 +1,24 @@
+{
+  "bbox_wgs84": [
+    -112.0665,
+    33.446,
+    -112.045,
+    33.464
+  ],
+  "extra": {
+    "feature_count": 18,
+    "vintage": "TIGER2022"
+  },
+  "fetched_at": "2026-09-05T10:23:07.305027+00:00",
+  "files": [
+    {
+      "bytes": 21394,
+      "path": "block_groups.parquet",
+      "sha256": "a394d4d815103aea448e5fa9be112e250588387f58144848cbdc4bbb02cfe730"
+    }
+  ],
+  "license": "Public domain -- US Census Bureau, TIGER/Line 2022",
+  "source": "tiger_block_groups",
+  "url": "https://www2.census.gov/geo/tiger/TIGER2022/BG/tl_2022_04_bg.zip",
+  "version": "2026-09-04"
+}

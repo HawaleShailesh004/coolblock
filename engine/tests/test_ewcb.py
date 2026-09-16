@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
 import pytest
@@ -102,3 +104,35 @@ def test_non_canopy_confidence_interval_equals_point_estimate() -> None:
     pd.testing.assert_series_equal(
         non_canopy["ewcb_high"], non_canopy["ewcb_person_degree_hours"], check_names=False
     )
+
+
+def test_load_population_points_reads_the_cache_when_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """docs/adr/0032-*.md: a solve must never need to touch
+    `data/cache/maricopa_parcels/` (real names and home addresses) to
+    answer "run the optimizer." Once `population_scored.geojson` exists,
+    it is read verbatim -- not recomputed from raw ingest cache."""
+    import engine.impact.ewcb as ewcb_module
+
+    real = load_population_points(use_cache=False)
+    cache_path = tmp_path / "population_scored.geojson"
+    real.to_crs(epsg=4326).to_file(cache_path, driver="GeoJSON")
+    monkeypatch.setattr(ewcb_module, "_cached_population_points_path", lambda: cache_path)
+
+    from_cache = load_population_points()
+    assert len(from_cache) == len(real)
+    assert {"hvi", "exposure", "population", "geometry"} <= set(from_cache.columns)
+
+
+def test_load_population_points_recomputes_when_cache_is_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import engine.impact.ewcb as ewcb_module
+
+    monkeypatch.setattr(
+        ewcb_module, "_cached_population_points_path", lambda: tmp_path / "does-not-exist.geojson"
+    )
+    population = load_population_points()
+    assert len(population) > 0
+    assert "hvi" in population.columns

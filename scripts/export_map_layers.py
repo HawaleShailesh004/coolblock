@@ -23,7 +23,7 @@ from engine.equity.hvi import compute_hvi
 from engine.equity.population import redistribute_population
 from engine.impact.albedo import run_albedo_model
 from engine.impact.cooling_kernel import CoolingKernelCalibration, run_cooling_kernel
-from engine.impact.ewcb import compute_ewcb
+from engine.impact.ewcb import compute_ewcb, load_population_points
 from engine.impact.shade import run_shade_raytrace
 from engine.ingest import d04_osm, d06_parcels, d07b_tiger_bg
 from engine.ingest.manifest import version_dir
@@ -114,6 +114,17 @@ def _build_scored_candidates() -> tuple[gpd.GeoDataFrame, CoolingKernelCalibrati
         crs=tree_scored.crs,
     )
     combined = compute_ewcb(combined, cooling_calibration=calibration)
+
+    # `owner_name` (engine/surface/candidates.py) is a real private parcel
+    # owner's name for `private`-ownership candidates -- it was only ever
+    # needed to *derive* `ownership` (already done), nothing downstream
+    # reads it (no test, no API code, no frontend component), and this
+    # dataframe is what both export_candidates() and
+    # export_optimizer_solution() write to disk and what the live API's
+    # ContextPanel renders every property of, click-to-inspect, for every
+    # layer. Dropped here, once, rather than trusted to be dropped by
+    # every future caller.
+    combined = combined.drop(columns=["owner_name"])
     return combined, calibration
 
 
@@ -203,6 +214,43 @@ def export_population() -> Path:
     return out_path
 
 
+def export_population_scored() -> Path:
+    """The exact per-request cache `engine.impact.ewcb.load_population_points()`
+    now reads first (docs/adr/0032-*.md), so that every solve doesn't
+    silently recompute D1/D2/D3 from raw ingest cache -- `data/cache/maricopa_parcels/`
+    in particular carries real names and home addresses, not something a
+    deploy target should ever need just to answer "run the optimizer."
+    `use_cache=False` forces the real recompute this export exists to
+    cache; every other caller keeps getting the fast cached read.
+
+    **Column-selected, like `export_population()` already is, not a raw
+    dump.** `redistribute_population()`'s buildings carry every OSM tag
+    the source `buildings.parquet` had (`addr:housenumber`, `phone`,
+    `operator`, ...) -- almost always null here, but real for the odd
+    named business or place of worship, and `load_population_points()`
+    only ever reads `hvi`/`exposure`/`population`/`geometry` back out
+    (`engine.optimize.objective.build_coverage_objective`). Caught by
+    actually inspecting this export's first row before committing it, not
+    assumed safe because the *previous* export already did this right."""
+    scored = load_population_points(use_cache=False).to_crs(epsg=4326)
+    out = scored[
+        [
+            "block_group_geoid",
+            "population",
+            "population_uncapped",
+            "block_group_population",
+            "footprint_m2",
+            "floor_count",
+            "hvi",
+            "exposure",
+            "geometry",
+        ]
+    ]
+    out_path = OUT_DIR / "population_scored.geojson"
+    out.to_file(out_path, driver="GeoJSON")
+    return out_path
+
+
 def export_hvi_choropleth() -> Path:
     """Phase 8 -- D2's Heat Vulnerability Index (`engine.equity.hvi.compute_hvi`)
     joined onto real Census TIGER block-group polygons (D7b) for a
@@ -247,6 +295,11 @@ def main() -> None:
         ("roads", export_roads),
         ("parcels", export_parcels),
         ("candidates", export_candidates),
+        # Before optimizer_selection: that solve reads load_population_points(),
+        # which reads this cache if present (engine/impact/ewcb.py) -- writing
+        # it first means the demo solve below is the same fast, cache-only
+        # read a deployed instance gets, not a one-off raw recompute.
+        ("population_scored", export_population_scored),
         ("optimizer_selection", export_optimizer_solution),
         ("population", export_population),
         ("hvi", export_hvi_choropleth),
