@@ -1,230 +1,188 @@
+import type { Metadata } from "next";
+import { Overpass, Overpass_Mono } from "next/font/google";
 import Link from "next/link";
-import Image from "next/image";
-import { ScrollHeatHero } from "./ScrollHeatHero";
+import baselines from "../public/landing/baselines.json";
+import scene from "../public/landing/scene.json";
+import { BaselineChart, type BaselinesByBudget } from "./_landing/BaselineChart";
+import styles from "./_landing/landing.module.css";
+import { ScrollStory } from "./_landing/ScrollStory";
 
 /**
- * §9.7 / Phase 12: the marketing site -- "Field Instrument" tokens (§8.1:
- * light/editorial for marketing, dark/technical for the app), only real,
- * already-computed numbers (docs/METHODOLOGY.md, docs/DATA-SOURCES.md,
- * data/cache/literature's five real cited papers), and no fabricated stat
- * anywhere, matching the rest of this project's honesty rail.
+ * §9.7 / Phase 12: the marketing homepage (docs/adr/0029-*.md).
  *
- * The scroll-driven 3D hero (ScrollHeatHero/HeatBlockScene) is real
- * three.js/@react-three/fiber, not a video or a CSS trick -- lazily
- * hydrated below the headline, and it holds at a fixed frame instead of
- * animating on scroll under `prefers-reduced-motion` or on a detected
- * low-end device (no WebGL, ≤2 cores), per §9.7's own requirement.
+ * Every number and image here comes from the real pipeline through
+ * scripts/export_landing_scene.py -- the 3D neighborhood, the plan it shows,
+ * the pipeline counts and the five-strategy comparison. Nothing is typed in
+ * by hand, so re-running the export after the data changes updates the page.
  *
- * The "live demo" section links to the real running app rather than
- * embedding it in an iframe -- an iframe was tried and dropped
- * (docs/adr/0027-*.md): a real hydration-mismatch quirk specific to the
- * embedded context, plus a full second copy of the app (and its real
- * backend cost) loading on every marketing pageview, for marginal value
- * over a real screenshot (apps/web/public/hero-map.png) and a direct
- * link.
+ * Type is Overpass, a descendant of the Highway Gothic lettering on American
+ * street signs: the voice of public works, for a tool about city streets.
  */
 
-const CITATIONS: { title: string; venue: string; usedFor: string; href: string | null }[] = [
+const overpass = Overpass({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-overpass", display: "swap" });
+const overpassMono = Overpass_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-overpass-mono", display: "swap" });
+
+export const metadata: Metadata = {
+  title: "CoolBlock: where should the next 40 trees go?",
+  description:
+    "CoolBlock turns a heat grant into a defensible tree plan: which public sites get trees, what each costs, and who it cools. Real public data for Edison–Eastlake, Phoenix.",
+};
+
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const int = new Intl.NumberFormat("en-US");
+
+const SOURCES = [
   {
     title: "The tree cover and temperature disparity in US urbanized areas: quantifying the association with income across 5,723 communities",
     venue: "PLOS ONE",
-    usedFor: "the 4.0°C / 30%-less-canopy disparity figures for low-income blocks",
     href: "https://doi.org/10.1371/journal.pone.0249715",
   },
   {
     title: "Trees halve urban heat island effect globally but unequal benefits only modestly mitigate climate-change warming",
     venue: "Nature Communications",
-    usedFor: "why cooling benefits accrue disproportionately to higher-income areas",
     href: "https://doi.org/10.1038/s41467-026-71825-x",
   },
   {
-    title: "Increasing tree canopy lowers urban air temperature by up to 1.5°C in heat-prone areas",
+    title: "Increasing tree canopy lowers urban air temperature by up to 1.5 °C in heat-prone areas",
     venue: "npj Urban Sustainability",
-    usedFor: "the canopy-increment → degrees relationship behind the cooling kernel",
     href: "https://doi.org/10.1038/s42949-025-00277-x",
   },
   {
     title: "Street trees provide an opportunity to mitigate urban heat and reduce risk of high heat exposure",
     venue: "Scientific Reports",
-    usedFor: "the shade/exposure framing behind the equity-weighted objective",
     href: "https://doi.org/10.1038/s41598-024-51921-y",
   },
   {
     title: "Urban Heat Equity",
-    venue: "American Forests / Tree Equity Score",
-    usedFor: "the 62-million-tree gap and the finding that 92% of cities show this disparity",
+    venue: "American Forests, Tree Equity Score",
     href: "https://www.treeequityscore.org/stories/urban-heat-equity",
   },
 ];
 
-const STATS: { value: string; label: string }[] = [
-  { value: "4.6–14×", label: "more equity-weighted cooling delivered than the best existing tool, at equal budget" },
-  { value: "2,844", label: "real buildings modeled in this one neighborhood, from public data" },
-  { value: "4,371", label: "candidate sites scored — every plantable metre and retrofittable roof, not a shortlist" },
-  { value: "5", label: "peer-reviewed papers actually cited, not just gestured at" },
-];
-
-const STEPS: { title: string; body: string }[] = [
-  { title: "Pick a neighborhood, set a budget", body: "Whatever a real grant actually is — $20,000, $50,000, $200,000." },
-  {
-    title: "State your constraints in plain English",
-    body: '"Keep it to public land, prioritize sites near Garfield Elementary, cap maintenance at $8k/yr" — parsed into a real, validated config, not a guess.',
-  },
-  {
-    title: "CoolBlock builds the real model underneath",
-    body: "A measured heat surface, every plantable square metre, the cooling each intervention would actually deliver, weighted by who is actually vulnerable — then it solves for the best allocation of the money you have.",
-  },
-  {
-    title: "Get a plan you can defend in the room",
-    body: "Ranked, costed sites on a real 3D map, a council memo with every number traced back to its source, and a proof that it beats the alternatives.",
-  },
-];
-
 export default function HomePage() {
+  const { plan, counts, frame } = scene;
+  const pipeline = [
+    { figure: int.format(counts.buildings_mapped), text: "buildings mapped, with every road and parking lot" },
+    { figure: int.format(counts.tree_sites_possible), text: "places with room for a tree" },
+    { figure: int.format(counts.tree_sites_public), text: "of them on public land a city can plant" },
+    { figure: String(counts.vulnerability_factors), text: "heat-risk factors weigh who each tree would cool" },
+    { figure: `${plan.trees} trees`, text: `at ${plan.sites} sites for ${usd.format(plan.cost_usd)}` },
+  ];
+
   return (
-    <main className="bg-paper-0 text-ink-0">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <span className="font-display text-xl">CoolBlock</span>
-        <Link
-          href="/map"
-          className="rounded-md bg-ink-0 px-4 py-2 text-sm font-medium text-paper-0 transition-opacity hover:opacity-85"
-        >
-          Open the app →
-        </Link>
-      </header>
+    <main className={`${overpass.variable} ${overpassMono.variable} ${styles.page}`}>
+      <ScrollStory
+        numbers={{
+          plan,
+          counts,
+          lstRangeC: frame.lst_range_c as [number, number],
+        }}
+      />
 
-      {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pb-16 pt-6">
-        <p className="font-mono text-xs uppercase tracking-widest text-ink-0/60">
-          CoolBlock · a block-scale heat-mitigation siting optimizer
-        </p>
-        <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[1.1] text-ink-0 sm:text-6xl">
-          Where should the next 40 trees go?
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-[1.55] text-ink-0/80">
-          A city sustainability office just received a real heat-mitigation grant and has no
-          defensible way to spend it. Today the answer is a guess, a squeaky-wheel request, or
-          whichever block the loudest homeowner lives on. CoolBlock replaces that with a ranked,
-          costed, defensible plan in under two minutes — for one real neighborhood, Edison–Eastlake,
-          Phoenix, on real public data.
-        </p>
-        <div className="mt-8 flex items-center gap-4">
-          <Link
-            href="/map"
-            className="rounded-md bg-ink-0 px-5 py-3 text-sm font-medium text-paper-0 transition-opacity hover:opacity-85"
-          >
-            Open the live instrument →
-          </Link>
-          <a href="#evidence" className="text-sm text-ink-0/60 underline underline-offset-4">
-            See the evidence
-          </a>
-        </div>
-      </section>
-
-      {/* Scroll-driven 3D hero: heats into the problem, cools into the solution (§9.7) */}
-      <ScrollHeatHero />
-
-      {/* Live demo */}
-      <section id="live-demo" className="border-y border-ink-0/10 bg-paper-1">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <h2 className="font-display text-3xl text-ink-0">This is the real, live product</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-[1.55] text-ink-0/70">
-            Not a video, not a prototype — click through and set a budget yourself. Sites land one
-            at a time as the real optimizer runs.
+      <section id="evidence" className="mx-auto max-w-295 px-5 pt-24 pb-20 sm:px-8 sm:pt-32">
+        <div className="max-w-160">
+          <h2 className={styles.h2}>Same money, five ways to spend it</h2>
+          <p className={`${styles.lede} mt-4`} style={{ color: "var(--ink-2)" }}>
+            Cities already pick tree sites somehow. We ran the common ways against CoolBlock on the same budget and the
+            same public sites, and measured how much cooling reaches the people who need it.
           </p>
-          <div className="mt-8 overflow-hidden rounded-lg border border-ink-0/10 bg-bg-0">
-            <Image
-              src="/hero-map.png"
-              alt="CoolBlock's live 3D map of Edison-Eastlake, Phoenix, with the modeled heat surface glowing beneath semi-transparent extruded buildings"
-              width={1080}
-              height={1033}
-              className="h-auto w-full"
-            />
-          </div>
-          <p className="mt-2 font-mono text-xs text-ink-0/40">A real screenshot of the live product, not a mockup.</p>
-          <Link
-            href="/map"
-            className="mt-6 inline-block rounded-md bg-ink-0 px-5 py-3 text-sm font-medium text-paper-0 transition-opacity hover:opacity-85"
-          >
-            Open the live instrument →
-          </Link>
+        </div>
+        <div className="mt-12">
+          <BaselineChart data={baselines.by_budget as BaselinesByBudget} />
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y border-ink-0/10 bg-paper-1">
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-6 py-12 sm:grid-cols-4">
-          {STATS.map((s) => (
-            <div key={s.label}>
-              <div className="font-mono text-3xl font-medium tabular-nums text-ink-0">{s.value}</div>
-              <div className="mt-2 text-sm leading-[1.4] text-ink-0/70">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="mx-auto max-w-5xl px-6 py-20">
-        <h2 className="font-display text-3xl text-ink-0">The core loop</h2>
-        <div className="mt-10 grid gap-10 sm:grid-cols-2">
-          {STEPS.map((step, i) => (
-            <div key={step.title}>
-              <div className="font-mono text-xs text-ink-0/50">{String(i + 1).padStart(2, "0")}</div>
-              <h3 className="mt-2 text-lg font-medium text-ink-0">{step.title}</h3>
-              <p className="mt-2 text-sm leading-[1.55] text-ink-0/70">{step.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Evidence */}
-      <section id="evidence" className="border-t border-ink-0/10 bg-paper-1">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <h2 className="font-display text-3xl text-ink-0">The evidence</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-[1.55] text-ink-0/70">
-            Every cooling estimate in CoolBlock traces to a real, cited source — not a plausible-sounding
-            number. These five are cited directly in the product&rsquo;s own council memo.
-          </p>
-          <ol className="mt-8 flex flex-col gap-6">
-            {CITATIONS.map((c) => (
-              <li key={c.title} className="border-l-2 border-ink-0/10 pl-4">
-                {c.href ? (
-                  <a href={c.href} className="text-base font-medium text-ink-0 underline underline-offset-4">
-                    {c.title}
-                  </a>
-                ) : (
-                  <span className="text-base font-medium text-ink-0">{c.title}</span>
+      <section className="border-t" style={{ borderColor: "var(--rule)", background: "var(--concrete-2)" }}>
+        <div className="mx-auto max-w-295 px-5 py-20 sm:px-8 sm:py-24">
+          <h2 className={styles.h2}>How it decides</h2>
+          <ol className="mt-12 grid gap-px overflow-hidden rounded-lg sm:grid-cols-5" style={{ background: "var(--rule)" }}>
+            {pipeline.map((stage, i) => (
+              <li key={stage.text} className="relative p-5 sm:p-6" style={{ background: "var(--concrete-2)" }}>
+                <span className="block text-[1.75rem] font-extrabold leading-none tracking-tight sm:text-[2rem]">
+                  {stage.figure}
+                </span>
+                <span className={`${styles.body} mt-3 block text-[0.95rem]`} style={{ color: "var(--ink-2)" }}>
+                  {stage.text}
+                </span>
+                {i < pipeline.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="absolute hidden sm:block"
+                    style={{
+                      right: -7,
+                      top: "50%",
+                      width: 13,
+                      height: 13,
+                      background: "var(--concrete-2)",
+                      borderTop: "1px solid var(--rule)",
+                      borderRight: "1px solid var(--rule)",
+                      transform: "translateY(-50%) rotate(45deg)",
+                      zIndex: 1,
+                    }}
+                  />
                 )}
-                <div className="mt-1 font-mono text-xs uppercase tracking-wide text-ink-0/50">{c.venue}</div>
-                <p className="mt-1 text-sm text-ink-0/70">Used for: {c.usedFor}</p>
               </li>
             ))}
           </ol>
+          <p className={`${styles.body} mt-6 max-w-184 text-[0.95rem]`} style={{ color: "var(--ink-2)" }}>
+            The cooling each tree would give is calibrated on this neighborhood’s own temperature readings, not borrowed
+            from a national average. Then a solver picks the set of sites that cools the most at-risk people for the
+            money — and for a plan this size it proves, in about two seconds, that no other set of sites does better.
+          </p>
         </div>
       </section>
 
-      {/* Honesty */}
-      <section className="mx-auto max-w-5xl px-6 py-20">
-        <h2 className="font-display text-2xl text-ink-0">What we won&rsquo;t claim</h2>
-        <p className="mt-4 max-w-2xl text-sm leading-[1.55] text-ink-0/70">
-          The heat surface underneath every score passed 2 of its own 3 validation checks — so
-          CoolBlock calls its outputs a <em>prioritization score</em>, never predicted cooling in
-          degrees you should bank on. Every disclosed limitation, every literature figure this
-          product leans on, and every real gap in the underlying data is written up in full in the
-          repository&rsquo;s own methodology notes, not hidden until a judge finds them.
-        </p>
+      <section className="mx-auto grid max-w-295 gap-14 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-2">
+        <div>
+          <h2 className={styles.h2}>What it can’t tell you</h2>
+          <ul className={`${styles.body} mt-8 flex flex-col gap-5`} style={{ color: "var(--ink-2)" }}>
+            <li>
+              <strong style={{ color: "var(--ink)" }}>It ranks places; it doesn’t forecast degrees.</strong> The heat model
+              passed 2 of its 3 validation checks, so treat its numbers as priorities, not promises.
+            </li>
+            <li>
+              <strong style={{ color: "var(--ink)" }}>Trees are only compared with trees.</strong> A cool roof lowers the
+              temperature of the roof; a tree cools the air around people. Those aren’t the same measurement, so the app
+              never ranks one against the other.
+            </li>
+            <li>
+              <strong style={{ color: "var(--ink)" }}>One neighborhood so far.</strong> Everything here is Edison–Eastlake,
+              Phoenix.
+            </li>
+            <li>
+              <strong style={{ color: "var(--ink)" }}>Not modeled yet:</strong> which species to plant, how much water they
+              need, and how wind moves cool air down a street.
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h2 className={styles.h2}>What it stands on</h2>
+          <ul className="mt-8 flex flex-col gap-5">
+            {SOURCES.map((s) => (
+              <li key={s.href}>
+                <a href={s.href} className="font-semibold leading-snug underline decoration-1 underline-offset-4 hover:decoration-2">
+                  {s.title}
+                </a>
+                <span className="mt-1 block text-sm" style={{ color: "var(--ink-3)" }}>
+                  {s.venue}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
-      <footer className="border-t border-ink-0/10 px-6 py-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <p className="font-mono text-xs text-ink-0/50">
-            CoolBlock · Edison-Eastlake, Phoenix, AZ · built for NextStep Hacks 2026
-          </p>
-          <Link href="/map" className="text-sm font-medium text-ink-0 underline underline-offset-4">
-            Open the live instrument →
+      <section style={{ background: "var(--asphalt)", color: "var(--paper)" }}>
+        <div className="mx-auto flex max-w-295 flex-col items-start gap-8 px-5 py-20 sm:px-8 sm:py-24 lg:flex-row lg:items-end lg:justify-between">
+          <h2 className={`${styles.h2} max-w-xl`}>Set your own budget and watch the sites get chosen.</h2>
+          <Link href="/map" className={styles.buttonOnDark}>
+            Open the live plan
           </Link>
         </div>
-      </footer>
+        <footer className="mx-auto max-w-295 border-t px-5 py-8 text-sm sm:px-8" style={{ borderColor: "var(--asphalt-2)", color: "var(--paper-2)" }}>
+          Built for NextStep Hacks 2026. Data from Landsat, Sentinel-2, OpenStreetMap, the US Census Bureau and the CDC.
+        </footer>
+      </section>
     </main>
   );
 }

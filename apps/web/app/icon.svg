@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="CoolBlock">
+  <!-- The block, and the one site on it the plan picks. -->
+  <rect width="32" height="32" rx="6" fill="#1d1f22" />
+  <rect x="6" y="6" width="20" height="20" rx="2" fill="#de4968" />
+  <rect x="6" y="6" width="20" height="10" rx="2" fill="#fe9f6d" />
+  <circle cx="16" cy="19" r="5" fill="#4cc9c0" />
+</svg>

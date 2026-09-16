@@ -1,0 +1,28 @@
+{
+  "program": "trees",
+  "public_land_only": true,
+  "unit": "equity-weighted cooling benefit (person-degree-hours)",
+  "by_budget": {
+    "20000": {
+      "spread_evenly": 67.0,
+      "worst_first": 43.7,
+      "squeaky_wheel": 0.2,
+      "tes_score_only": 1181.5,
+      "coolblock": 4056.9
+    },
+    "50000": {
+      "spread_evenly": 274.8,
+      "worst_first": 46.2,
+      "squeaky_wheel": 6718.9,
+      "tes_score_only": 8182.2,
+      "coolblock": 11775.4
+    },
+    "100000": {
+      "spread_evenly": 807.1,
+      "worst_first": 45.8,
+      "squeaky_wheel": 6762.1,
+      "tes_score_only": 7219.8,
+      "coolblock": 18178.8
+    }
+  }
+}

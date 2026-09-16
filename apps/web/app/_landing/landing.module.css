@@ -1,0 +1,143 @@
+/*
+ * Marketing homepage tokens. The ground is the neighborhood's own materials:
+ * asphalt for the dark story frames, sun-bleached concrete for reading. The
+ * thermal ramp (packages/ui tokens --t-*) appears only where it encodes real
+ * temperature, and canopy teal only where it marks what the plan picks.
+ * Text colors are checked against their grounds (all >= 4.5:1).
+ */
+.page {
+  --asphalt: #1d1f22;
+  --asphalt-2: #2a2d31;
+  --concrete: #e8e6e1;
+  --concrete-2: #dedbd4;
+  --rule: #cfccc4;
+  --ink: #15171a; /* 14.4:1 on concrete */
+  --ink-2: #4b4e53; /* 6.7:1 on concrete */
+  --ink-3: #5e6167; /* 5.0:1 on concrete */
+  --paper: #eeece7; /* 14.0:1 on asphalt */
+  --paper-2: #a3a5a8; /* 6.7:1 on asphalt */
+  --canopy: #4cc9c0; /* the plan, on asphalt (8.2:1) */
+  --canopy-ink: #008c80; /* the plan, on concrete (validated bar color) */
+  --chart-muted: #b5b3ad; /* other strategies' bars (values also labeled + table view) */
+
+  background: var(--concrete);
+  color: var(--ink);
+  font-family: var(--font-overpass), system-ui, sans-serif;
+  font-feature-settings: "kern", "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--font-overpass-mono), ui-monospace, "SFMono-Regular", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Figures that carry a thousands separator. Overpass Mono gives the comma a
+ * full character width ("4 , 057"), which reads as a typo at small sizes, so
+ * numbers wear the text face with tabular figures instead: columns still line
+ * up, the comma sits where a reader expects it.
+ */
+.figure {
+  font-family: var(--font-overpass), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+
+.display {
+  font-weight: 800;
+  font-size: clamp(2.6rem, 1.5rem + 4.4vw, 5.1rem);
+  line-height: 0.98;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+}
+
+.stepTitle {
+  font-weight: 800;
+  font-size: clamp(1.9rem, 1.25rem + 2.4vw, 3.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+.h2 {
+  font-weight: 800;
+  font-size: clamp(1.9rem, 1.35rem + 2vw, 3rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.lede {
+  font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.25rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.body {
+  font-size: 1rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.buttonOnDark,
+.buttonOnLight {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1.25rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.975rem;
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.buttonOnDark {
+  background: var(--canopy);
+  color: var(--asphalt);
+}
+.buttonOnDark:hover {
+  background: #6fd6ce;
+}
+.buttonOnLight {
+  background: var(--ink);
+  color: var(--concrete);
+}
+.buttonOnLight:hover {
+  background: #2c2f34;
+}
+
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 3px solid var(--canopy);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.step {
+  transition:
+    opacity 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.heatLegend {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0b0a1f, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf);
+}
+
+.bar {
+  transition: width 480ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.barLabel {
+  transition: left 480ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .bar,
+  .barLabel,
+  .buttonOnDark,
+  .buttonOnLight {
+    transition: none;
+  }
+}
