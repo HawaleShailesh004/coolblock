@@ -1,0 +1,296 @@
+# CoolBlock — Build log
+
+> A phase-by-phase engineering diary: what was built, what broke, what was
+> found and fixed along the way, in the order it actually happened. The
+> [README](../README.md) is the front door; this is the warts-and-all record
+> behind it. Kept because the bugs found and the honesty-rail decisions made
+> are themselves part of what this project is arguing — that a real pipeline
+> against real data surfaces real problems a mockup never would. Each
+entry was true when it was written; for the current state, read the
+[README](../README.md) instead.
+
+**Phase 8 — frontend core.** Phases 0-6 are done:
+
+- **0-2**: foundations, the data foundry (all 16 sources, see
+  [`DATA-SOURCES.md`](DATA-SOURCES.md)), and the map, first light.
+- **3**: the heat engine — TsHARP-downscaled 10m surface temperature,
+  validated 2/3, honesty rail applied (see
+  [`METHODOLOGY.md`](METHODOLOGY.md)).
+- **4**: plantable space — rule-based (ML fusion deferred, see
+  [`adr/0005-*.md`](adr/0005-plantable-space-rule-first.md)),
+  1,481 real polygons, 1,472 candidates with ownership classification.
+- **5**: impact & equity — the cooling kernel (C1, locally calibrated),
+  shade raytracing (C2), the albedo model (C3), dasymetric population and
+  the Heat Vulnerability Index (D1/D2), exposure weighting and the
+  Equity-Weighted Cooling Benefit objective (D3/D4).
+- **6**: the optimizer — exact MILP via HiGHS, which proves the optimal
+  plan on the default pool in about two seconds and is what the product
+  hands out ([`adr/0028-*.md`](adr/0028-the-plan-we-hand-out-is-the-proven-optimal-one.md));
+  CELF lazy greedy (E2) as the fallback for pools too large to prove; a
+  constrained greedy for real side constraints (E3), the efficient
+  frontier (E4), and the five-baseline comparison (E5) — on the default
+  plan, **trees on public land, CoolBlock delivers 1.4–3.4× the
+  Equity-Weighted Cooling Benefit of the best alternative (Tree Equity
+  Score ranking)** at equal budget. (An earlier 4.6–14× figure came from ranking trees and cool roofs
+  together, which always picked 100% cool roofs; trees and cool roofs are
+  now separate programs — see
+  [`adr/0027-*.md`](adr/0027-programs-trees-and-cool-roofs-never-ranked-together.md).)
+
+**7**: a real FastAPI service — Postgres-backed plans and scenario
+versions, Clerk-shaped auth with a documented local-dev fallback (no
+Clerk tenant provisioned yet, see
+[`adr/0016-*.md`](adr/0016-auth-dev-fallback-and-clerk-integration.md)),
+an ARQ+Redis job queue that runs the real solver and streams its stages
+over SSE with clean reconnect, GeoJSON/CSV export, and public share links —
+see [`adr/0017-*.md`](adr/0017-phase7-schema-and-job-streaming-architecture.md)
+and §8 of [`RUNNING-AND-TESTING.md`](RUNNING-AND-TESTING.md) for
+how to run and verify it.
+
+**8 (in progress)**: the live optimizer, wired to that real backend — a
+budget slider and constraint controls that create a plan, trigger a real
+solve, and stream it onto the map site-by-site over a hand-rolled
+`fetch`-based SSE client (`apps/web/lib/sse.ts` — the browser's native
+`EventSource` can't send the custom auth headers this app uses), plus a
+ranked-sites table (a full peer view of the same data, §8.6), GeoJSON/CSV
+export, share links, and a deep-linkable plan/version URL. Two new map
+layers: dasymetric population (D1) and the HVI choropleth (D2). Building
+this frontend caught and fixed a real bug in Phase 7's SSE endpoint (a
+fast client could have its stream closed within milliseconds of
+connecting, before the worker even started — see
+[`adr/0017-*.md`](adr/0017-phase7-schema-and-job-streaming-architecture.md)'s
+amendment) that manual `curl` testing had never caught. Also: real
+per-layer loading/error states with a retry action, a table view for
+every layer (§8.6), six HVI weight sliders that recompute the choropleth
+live client-side from real per-indicator z-scores (§6.4 D2's "a planner
+can and should argue with them"), and a real "beats the alternatives"
+screen (§9 ★5) — CoolBlock's own solve against all four E5 baselines, at
+the scenario's own budget, via a new `/baselines` endpoint. See §9.1 of
+[`RUNNING-AND-TESTING.md`](RUNNING-AND-TESTING.md) to verify all
+of it.
+
+**10 (started)**: the intelligence layer — L3, the council memo, and L6,
+its numeric provenance guard. Claude (opus, "quality, run once") drafts
+the memo against this plan's own real, computed data (sites, EWCB,
+citations to the five real papers D16 already registered); every number
+in the output is then extracted and checked against that same data
+(`engine/narrate/provenance.py`), regenerated once if anything fails to
+verify, and rendered with a hover showing each number's exact source
+(green) or a warning if it still couldn't be verified (amber). The
+honesty rail is enforced in the prompt itself, not left to chance: the
+heat surface's validation gate didn't clear all three checks (2 of 3, see
+`METHODOLOGY.md`), so the model is instructed to say "prioritization
+score," never "predicted cooling" — verified live in this session's own
+first real generation, which used that exact language unprompted beyond
+the rule. That same run also caught and corrected one hallucinated number
+via the regeneration path, a live demonstration of L6 doing its job.
+**Provider switch added mid-build**
+([`adr/0019-*.md`](adr/0019-groq-fallback-provider-for-the-council-memo.md)):
+the account's Claude API credit balance ran out partway through this
+session's testing, so a second provider (Groq, `openai/gpt-oss-120b`)
+was wired in behind the same `generate_council_memo` call — selectable
+via `MEMO_LLM_PROVIDER` in `.env` or a per-request `provider` param/UI
+dropdown, not a hard swap. Wiring it up surfaced two real, general-purpose
+bugs in L6 that Claude's own generations had never triggered (numbers
+embedded in citation-title *strings* weren't grounded at all; a candidate
+id's hyphen was misread as a unary minus when scanning payload strings) —
+both fixed, both apply to either provider. A full real run against a
+solved scenario, via the actual API endpoint, converged to zero
+unverified numbers with no regeneration needed. Claude remains the
+intended default (`.env.example`) once its balance is topped up; Groq is
+this build's working fallback in the meantime (`.env`'s
+`MEMO_LLM_PROVIDER=groq`).
+
+**L1 added** ([`adr/0020-*.md`](adr/0020-nl-to-constraints-with-real-tool-calls.md)):
+natural language to optimizer constraints, via a real, live tool-use loop
+(`engine/narrate/constraints_nl.py`), not a free-text parse. A sentence
+like *"Keep it to public land only, prioritize sites near Booker T
+Washington School, cap annual maintenance at $8,000"* resolves the named
+school against the real cached OSM data, pulls the real candidate ids
+within 300m of its real coordinates, and returns a schema-validated
+constraint set — new `POST /plans/parse-constraints`, wired into
+`OptimizerPanel`'s new "Describe constraints" box. Caught and fixed two
+real bugs live: a CRS bug (`resolve_place` was returning raw UTM-zone-12N
+meters as if they were WGS84 degrees) and a Groq-specific schema
+rejection (the model emitted `null` for an empty list field where the
+tool schema only allowed an array, a real 400 from Groq's own
+server-side validator). A request for something with no real constraint
+field (a species-diversity cap, in testing) is disclosed via
+`unsupported_requests`, never silently dropped or invented.
+
+**§7.2 verification, closed via the fallback `adr/0002-*.md` already
+committed to at Phase 0** (no Wolfram Cloud credential — offered again
+this session, still not available):
+[`adr/0021-*.md`](adr/0021-engine-verify-without-wolfram.md).
+`engine/verify/` now has three real modules, each substituting a specific
+non-Wolfram tool for what the plan asked Wolfram to do — `pint` for
+unit-checked thermal math (`units.py`, promoting `engine/impact/albedo.py`'s
+existing *manual* unit-check comment into code that actually enforces it,
+proven by deliberately constructing and catching a real unit error),
+`sympy` for symbolic calibration (`sensitivity.py`, a real symbolic
+derivative proving beta's confidence interval really does propagate
+linearly into ΔT_peak's, not assumed), and the exact MILP solver already
+built in Phase 6 (`optimizer_crosscheck.py`, formalizing the
+previously-notebook-only 99.6-99.9% CELF-vs-exact measurement as real,
+reusable, tested code — including a deliberately-adversarial instance
+proving the check can detect real disagreement, not just agreement).
+None of this sits on the demo path, matching §7.2's own framing.
+
+**Phase 10 status, per the plan's own MUST/SHOULD/COULD split** (§12.1):
+all three SHOULD-tier items (L1, L6, Wolfram verification) are done. L2
+(per-site rationale), L4 (grant packet), and L5 (analyst agent) remain
+explicitly COULD-tier/roadmap-only, not built in this pass.
+
+**Phase 13 (started)**: hardening. First concrete finding: the basemap's
+*tiles* were already self-hosted from local MinIO, but its labels
+(glyphs) and icons (sprite) were still loaded live from
+`protomaps.github.io` — meaning "disconnect the internet and run the
+entire demo" (Phase 13's own checkpoint) would have silently dropped
+every map label and icon, a real, judge-visible gap, not a hypothetical
+one. Fixed:
+[`adr/0022-*.md`](adr/0022-self-hosted-basemap-glyphs-and-sprite.md),
+`scripts/build_map_assets.sh` (a ~620KB one-time download of exactly the
+fontstacks/Unicode ranges this neighborhood's real labels need, matching
+`scripts/build_basemap.sh`'s own established self-hosting pattern). Found
+and fixed a real Windows/Docker bug along the way: a bind-mount with a
+plain Git-Bash POSIX path silently bound to nothing on this machine.
+**Second finding, same pass**: no error boundaries and no security
+headers existed at all. Added
+[`adr/0023-*.md`](adr/0023-error-boundaries-and-csp.md): a
+styled 404 (`not-found.tsx`), a route-level error boundary with a real
+"Try again" recovery action (`error.tsx`), a root-layout-crash fallback
+(`global-error.tsx`), and a CSP scoped to exactly the three local
+services the client actually talks to (audited, not guessed — the API,
+TiTiler, and MinIO). Disclosed tradeoff: `script-src`/`style-src` keep
+`'unsafe-inline'` for Next's own inline hydration scripts rather than
+building a nonce-based strict CSP unverifiable without a browser this
+session — confirmed via `curl` that every header applies correctly, but
+whether the map's WebGL rendering is CSP-clean needs a real browser
+check, flagged as the one open item. Also fixed a real bug found while
+in `next.config.ts`: the previous session's `NEXT_PUBLIC_MAP_ASSETS_URL`
+was never added to the explicit client-env allowlist, so an override in
+`.env` would have been silently ignored.
+
+**Third finding, with a real browser now in the loop**: building Phase
+13's E2E suite ([`adr/0024-*.md`](adr/0024-e2e-suite-and-four-real-bugs-it-found.md),
+`e2e/*.spec.ts`, `playwright.config.ts`) surfaced four real, independent
+bugs — none hypothetical, each confirmed by actually reproducing it:
+(1) the "Share link" button generated a URL for a page,
+`/share/[token]`, that never existed; (2) "Export GeoJSON"/"Export CSV"
+were plain `<a href>` links to a workspace-scoped endpoint, so a real
+browser click silently 404'd (a header-carrying `Blob` download, not a
+plain link, was the real fix); (3) CORS only ever allowed
+`localhost:3000`, so Next's own automatic fallback to 3001+ when 3000 is
+taken — which happened on this very machine mid-session, unprompted, from
+an unrelated project — broke every API call with no clear error; and
+(4) **the previous pass's own new CSP broke the optimizer entirely in
+`next dev`** (blocked `eval`, which Next's dev-mode HMR tooling needs,
+confirmed by reproducing the exact break and then confirming a
+production build has no such issue) — resolving `adr/0023-*.md`'s
+own flagged "needs a real browser check" item, the hard way. All three
+E2E specs (the full journey, the share flow, the export flow — the
+reconnect flow is already covered at the API level,
+`test_solve_end_to_end.py`) now pass 6/6 against the real, full local
+stack.
+
+Phase 13's much larger remaining scope (golden-file tests, a security
+audit beyond CSP, performance/bundle work, cross-browser testing) is
+untouched — these are three concrete slices, not a claim the phase is
+done.
+
+**A fifth finding**: the user reported the live app's map "looks
+broken." A real screenshot (via a standalone `playwright` script, not an
+MCP connector) showed why — buildings rendered at near-opaque fill, and
+with 2,844 densely-packed buildings at the default pitched camera, their
+solid extruded walls visually hid almost the entire heat surface
+underneath, directly undermining §9 ★1's own "the surface glows beneath
+the 3D block." Every tile request had actually succeeded — confirmed via
+network capture — this was a rendering-value regression, not a broken
+pipeline. Fixed by halving building opacity across every honesty-rail
+tier; confirmed with a direct before/after screenshot comparison. See
+[`adr/0025-*.md`](adr/0025-building-opacity-was-hiding-the-heat-surface.md).
+
+**Phase 12 (started)**: the marketing site. `apps/web/app/page.tsx` was
+still the literal Phase 0 placeholder through every phase since — replaced
+with a real, static-generated one-pager using the "Field Instrument"
+light/editorial tokens the design system already declared: a hero image
+that is a genuine screenshot of the live product (not a mockup), four
+real stats, the five real cited papers with real DOI links, and an
+honest disclosure section — no fabricated claim anywhere on the page.
+Also fixed a real, silent gap found in the same pass: `--font-display`/`--font-ui`/`--font-mono`
+were plain fallback font-family stacks that were never actually loaded —
+every page in this app, including `/map`, has been silently rendering in
+system fallback fonts (Georgia/system-ui), not the design system's
+specified faces, this entire build. Fixed via `next/font/google`
+(self-hosted, no new CSP exception needed). See
+[`adr/0026-*.md`](adr/0026-marketing-site-real-one-pager.md).
+
+**Phase 12, §9.7 completed**: the scroll-driven 3D hero is real
+three.js/@react-three/fiber (`apps/web/app/HeatBlockScene.tsx`), a
+deterministic building grid over a ground plane that transitions between
+this project's own real thermal-ramp tokens as you scroll — lazily
+hydrated below the headline (confirmed the homepage bundle stayed at
+7.17 kB / 116 kB First Load JS), holding at a fixed frame under
+`prefers-reduced-motion` or a detected low-end device, per §9.7's own
+requirement. Verified with real screenshots at multiple scroll positions,
+not assumed from the code. Found and fixed a real crash along the way (a
+stale `.next` RSC cache after the new three.js dependencies landed,
+throwing a real error that tripped this app's own `global-error.tsx`) —
+and found, then deliberately reversed, a live-demo iframe embed of `/map`
+after it produced a real, embed-specific hydration mismatch plus a real
+backend-cost/GPU-contention concern; the live demo is a real screenshot
+and a direct link instead. See
+[`adr/0027-*.md`](adr/0027-scroll-driven-3d-hero.md).
+
+**Phase 12 completed**: the marketing homepage was rebuilt around the real
+neighborhood instead of arguing about it — a scroll-driven three.js scene
+built from the pipeline's own outputs (measured heat as the ground, real
+building footprints, all 773 public tree sites, then the sites the default
+plan picks, rising in the order the optimizer picked them), a real baseline
+chart with a budget toggle and a table view, and a pipeline strip built from
+real counts, not typed-in numbers. Caught and fixed by actually looking at
+screenshots at each scroll step, not just reading the code: 773 site markers
+were invisible against the hot end of the thermal ramp, the camera dove so
+close the chosen sites read as abstract slabs, and unpicked sites sat on the
+ground as flat discs giving away the plan before it landed. See
+[`adr/0029-*.md`](adr/0029-landing-page-is-the-real-neighborhood.md).
+
+**The exact-solver switch**: writing that page's copy forced a check of a
+number carried over from Phase 6 — "CELF is within 0.4% of exact" — against
+the pool the product actually solves since ADR-0027 (773 public tree sites,
+not the old 300-candidate mixed reduced instance). It wasn't true: at
+$20,000, CELF reaches only 86.2% of the provable optimum, and HiGHS proves
+that optimum in under two seconds on this pool. `engine/optimize/best_plan.py`
+now runs the exact solver first and only falls back to CELF when the pool is
+too large to prove in time, and every producer of a plan — the app, the
+baseline comparison, the static map export — goes through that one function,
+so the comparison chart can never score CoolBlock with a weaker solver than
+what it actually hands out. See
+[`adr/0028-*.md`](adr/0028-the-plan-we-hand-out-is-the-proven-optimal-one.md).
+
+**A live-service outage caught a real regression, then got fixed**: Docker
+Desktop wedged on the dev machine mid-build (its named pipes accepted a
+connection and then never answered) while the two changes above were being
+committed, so the API and E2E suites went uncommitted-but-unverified for one
+turn. Once Docker came back, running both for real found that the E2E
+suite's shared "wait for the solve to finish" helper was still matching the
+old `"... EWCB (celf)"` text against a panel that now renders
+`"... EWCB · proven optimal"` — a real, if narrow, regression from showing
+the solver in words. Fixed and reverified: 35/35 API tests, 6/6 E2E specs,
+and every solve driven through the real API and ARQ worker during that run
+recorded as `exact_milp` in Postgres, matching the plan the docs quote.
+
+**Privacy fix found while preparing this repo for its first public push**:
+`candidates.geojson`'s `owner_name` column — a real Maricopa County parcel
+owner's name, kept only to derive the public/private `ownership`
+classification the optimizer needs — was never read by anything downstream,
+but was carried through into every export and, via the map's
+generic click-to-inspect `ContextPanel`, was visible in the running app.
+Stripped at its one point of export
+([`adr/0030-*.md`](adr/0030-derived-data-committed-owner-names-stripped.md)); nothing downstream needed it.
+
+**Deploy prep**: the locked neighborhood's derived data (~15 MB) is now
+committed as a narrow, explicit exception to the usual `data/derived`
+ignore rule — a fresh clone or a fresh free-tier deploy has a working app
+immediately, without a 20-90 minute cold-pipeline run first. See
+[`adr/0030-*.md`](adr/0030-derived-data-committed-owner-names-stripped.md)
+and [`DEPLOYMENT.md`](DEPLOYMENT.md).

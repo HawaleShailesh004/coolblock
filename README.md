@@ -1,282 +1,156 @@
 # CoolBlock
 
-> **"Everyone built the map. Nobody built the plan."**
-> A block-scale heat-mitigation siting optimizer. You give it a neighborhood
-> and a budget. It gives you the ranked parcels, the modeled degrees, the
-> people cooled, and the memo you take to city council.
+> **Everyone built the map. Nobody built the plan.**
 
-Built for NextStep Hacks 2026 — "Earth Forward". Full design and phase plan:
-[`COOLBLOCK-BUILD-PLAN.md`](COOLBLOCK-BUILD-PLAN.md). Architecture notes:
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Decisions:
-[`docs/adr/`](docs/adr/). **Running it locally and checking that it actually
-works: [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md).**
+CoolBlock is a block-scale heat-mitigation siting optimizer. Give it a
+neighborhood and a budget; it gives back the ranked list of public sites to
+plant trees, the modeled cooling, the people it actually reaches, and a
+council-ready memo — not another heat map that ends the conversation exactly
+where a city council needs it to start.
 
-Locked target: **Edison-Eastlake, Phoenix, AZ** — see
-[`config/neighborhood.toml`](config/neighborhood.toml).
+Built for NextStep Hacks 2026 ("Earth Forward"). Locked pilot neighborhood:
+**Edison–Eastlake, Phoenix, AZ** — see [`config/neighborhood.toml`](config/neighborhood.toml).
 
-## Status
+**[Live demo →](#)** _(added once deployed — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md))_
 
-**Phase 8 — frontend core: in progress.** Phases 0-6 are done:
+## The problem
 
-- **0-2**: foundations, the data foundry (all 16 sources, see
-  [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md)), and the map, first light.
-- **3**: the heat engine — TsHARP-downscaled 10m surface temperature,
-  validated 2/3, honesty rail applied (see
-  [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)).
-- **4**: plantable space — rule-based (ML fusion deferred, see
-  [`docs/adr/0005-*.md`](docs/adr/0005-plantable-space-rule-first.md)),
-  1,481 real polygons, 1,472 candidates with ownership classification.
-- **5**: impact & equity — the cooling kernel (C1, locally calibrated),
-  shade raytracing (C2), the albedo model (C3), dasymetric population and
-  the Heat Vulnerability Index (D1/D2), exposure weighting and the
-  Equity-Weighted Cooling Benefit objective (D3/D4).
-- **6**: the optimizer — exact MILP via HiGHS, which proves the optimal
-  plan on the default pool in about two seconds and is what the product
-  hands out ([`docs/adr/0028-*.md`](docs/adr/0028-the-plan-we-hand-out-is-the-proven-optimal-one.md));
-  CELF lazy greedy (E2) as the fallback for pools too large to prove; a
-  constrained greedy for real side constraints (E3), the efficient
-  frontier (E4), and the five-baseline comparison (E5) — on the default
-  plan, **trees on public land, CoolBlock delivers 1.4–3.4× the
-  Equity-Weighted Cooling Benefit of the best alternative (Tree Equity
-  Score ranking)** at equal budget. (An earlier 4.6–14× figure came from ranking trees and cool roofs
-  together, which always picked 100% cool roofs; trees and cool roofs are
-  now separate programs — see
-  [`docs/adr/0027-*.md`](docs/adr/0027-programs-trees-and-cool-roofs-never-ranked-together.md).)
+Extreme heat kills more people in the US every year than any other weather
+hazard, and it doesn't land evenly — the same city block can run several
+degrees hotter than one a mile away, and the hottest blocks are consistently
+the ones with the least tree canopy, the oldest housing, and the fewest cars.
+Cities increasingly *have* money for this (federal and state urban-heat
+grants), real satellite heat data, and no shortage of dashboards showing them
+where it's hot. What they don't have is a defensible answer to the next
+question: **given $50,000 and 300 possible sites, which ones, in what order,
+and why those and not the others?**
 
-**7**: a real FastAPI service — Postgres-backed plans and scenario
-versions, Clerk-shaped auth with a documented local-dev fallback (no
-Clerk tenant provisioned yet, see
-[`docs/adr/0016-*.md`](docs/adr/0016-auth-dev-fallback-and-clerk-integration.md)),
-an ARQ+Redis job queue that runs the real solver and streams its stages
-over SSE with clean reconnect, GeoJSON/CSV export, and public share links —
-see [`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)
-and §8 of [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) for
-how to run and verify it.
+That's a budget-constrained optimization problem, not a ranking problem — two
+trees eight meters apart don't deliver double the cooling, so "sort every
+site by score and take the top N" (what every heat-map tool actually does)
+systematically produces a worse plan than the money could buy. CoolBlock
+solves the actual problem: maximize equity-weighted cooling benefit subject
+to a real budget, with a real solver, not a spreadsheet sort.
 
-**8 (in progress)**: the live optimizer, wired to that real backend — a
-budget slider and constraint controls that create a plan, trigger a real
-solve, and stream it onto the map site-by-site over a hand-rolled
-`fetch`-based SSE client (`apps/web/lib/sse.ts` — the browser's native
-`EventSource` can't send the custom auth headers this app uses), plus a
-ranked-sites table (a full peer view of the same data, §8.6), GeoJSON/CSV
-export, share links, and a deep-linkable plan/version URL. Two new map
-layers: dasymetric population (D1) and the HVI choropleth (D2). Building
-this frontend caught and fixed a real bug in Phase 7's SSE endpoint (a
-fast client could have its stream closed within milliseconds of
-connecting, before the worker even started — see
-[`docs/adr/0017-*.md`](docs/adr/0017-phase7-schema-and-job-streaming-architecture.md)'s
-amendment) that manual `curl` testing had never caught. Also: real
-per-layer loading/error states with a retry action, a table view for
-every layer (§8.6), six HVI weight sliders that recompute the choropleth
-live client-side from real per-indicator z-scores (§6.4 D2's "a planner
-can and should argue with them"), and a real "beats the alternatives"
-screen (§9 ★5) — CoolBlock's own solve against all four E5 baselines, at
-the scenario's own budget, via a new `/baselines` endpoint. See §9.1 of
-[`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) to verify all
-of it.
+## What it actually does
 
-**10 (started)**: the intelligence layer — L3, the council memo, and L6,
-its numeric provenance guard. Claude (opus, "quality, run once") drafts
-the memo against this plan's own real, computed data (sites, EWCB,
-citations to the five real papers D16 already registered); every number
-in the output is then extracted and checked against that same data
-(`engine/narrate/provenance.py`), regenerated once if anything fails to
-verify, and rendered with a hover showing each number's exact source
-(green) or a warning if it still couldn't be verified (amber). The
-honesty rail is enforced in the prompt itself, not left to chance: the
-heat surface's validation gate didn't clear all three checks (2 of 3, see
-`docs/METHODOLOGY.md`), so the model is instructed to say "prioritization
-score," never "predicted cooling" — verified live in this session's own
-first real generation, which used that exact language unprompted beyond
-the rule. That same run also caught and corrected one hallucinated number
-via the regeneration path, a live demonstration of L6 doing its job.
-**Provider switch added mid-build**
-([`docs/adr/0019-*.md`](docs/adr/0019-groq-fallback-provider-for-the-council-memo.md)):
-the account's Claude API credit balance ran out partway through this
-session's testing, so a second provider (Groq, `openai/gpt-oss-120b`)
-was wired in behind the same `generate_council_memo` call — selectable
-via `MEMO_LLM_PROVIDER` in `.env` or a per-request `provider` param/UI
-dropdown, not a hard swap. Wiring it up surfaced two real, general-purpose
-bugs in L6 that Claude's own generations had never triggered (numbers
-embedded in citation-title *strings* weren't grounded at all; a candidate
-id's hyphen was misread as a unary minus when scanning payload strings) —
-both fixed, both apply to either provider. A full real run against a
-solved scenario, via the actual API endpoint, converged to zero
-unverified numbers with no regeneration needed. Claude remains the
-intended default (`.env.example`) once its balance is topped up; Groq is
-this build's working fallback in the meantime (`.env`'s
-`MEMO_LLM_PROVIDER=groq`).
+1. **Ingests real data** for the locked neighborhood — Landsat/Sentinel-2
+   satellite imagery, OpenStreetMap, Census ACS, CDC social vulnerability,
+   Maricopa County parcels — 16 sources, see [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md).
+2. **Builds a real surface-temperature model**, downscaled to 10m and
+   validated against the city's own published shade plan (2 of 3 validation
+   checks pass — disclosed, not hidden, see [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)).
+3. **Finds every plantable site** on public land — street edges, park and
+   lot margins, bus-stop shade candidates — and scores each one's real
+   modeled cooling, shade delivered, and who it reaches, weighted by a real
+   heat-vulnerability index (age, income, health conditions, car access).
+4. **Solves the actual optimization problem**: an exact MILP (HiGHS) proves
+   the *provably best* set of sites for the budget in about two seconds; a
+   fast greedy fallback (CELF, submodular-maximization guarantee) handles
+   pools too large to prove in time. See [`docs/adr/0028-*.md`](docs/adr/0028-the-plan-we-hand-out-is-the-proven-optimal-one.md).
+5. **Shows its work**: a live map with the ranked plan, a five-strategy
+   comparison against how cities actually pick sites today, GeoJSON/CSV
+   export, share links, and an LLM-drafted council memo where every number is
+   checked against the real computed data before it's shown to you.
 
-**L1 added** ([`docs/adr/0020-*.md`](docs/adr/0020-nl-to-constraints-with-real-tool-calls.md)):
-natural language to optimizer constraints, via a real, live tool-use loop
-(`engine/narrate/constraints_nl.py`), not a free-text parse. A sentence
-like *"Keep it to public land only, prioritize sites near Booker T
-Washington School, cap annual maintenance at $8,000"* resolves the named
-school against the real cached OSM data, pulls the real candidate ids
-within 300m of its real coordinates, and returns a schema-validated
-constraint set — new `POST /plans/parse-constraints`, wired into
-`OptimizerPanel`'s new "Describe constraints" box. Caught and fixed two
-real bugs live: a CRS bug (`resolve_place` was returning raw UTM-zone-12N
-meters as if they were WGS84 degrees) and a Groq-specific schema
-rejection (the model emitted `null` for an empty list field where the
-tool schema only allowed an array, a real 400 from Groq's own
-server-side validator). A request for something with no real constraint
-field (a species-diversity cap, in testing) is disclosed via
-`unsupported_requests`, never silently dropped or invented.
+## Measured, not asserted
 
-**§7.2 verification, closed via the fallback `docs/adr/0002-*.md` already
-committed to at Phase 0** (no Wolfram Cloud credential — offered again
-this session, still not available):
-[`docs/adr/0021-*.md`](docs/adr/0021-engine-verify-without-wolfram.md).
-`engine/verify/` now has three real modules, each substituting a specific
-non-Wolfram tool for what the plan asked Wolfram to do — `pint` for
-unit-checked thermal math (`units.py`, promoting `engine/impact/albedo.py`'s
-existing *manual* unit-check comment into code that actually enforces it,
-proven by deliberately constructing and catching a real unit error),
-`sympy` for symbolic calibration (`sensitivity.py`, a real symbolic
-derivative proving beta's confidence interval really does propagate
-linearly into ΔT_peak's, not assumed), and the exact MILP solver already
-built in Phase 6 (`optimizer_crosscheck.py`, formalizing the
-previously-notebook-only 99.6-99.9% CELF-vs-exact measurement as real,
-reusable, tested code — including a deliberately-adversarial instance
-proving the check can detect real disagreement, not just agreement).
-None of this sits on the demo path, matching §7.2's own framing.
+CoolBlock's default plan — trees on public land — against the best
+alternative status quo (ranking sites by Tree Equity Score, the most common
+real tool), same budget, same real sites, same real objective:
 
-**Phase 10 status, per the plan's own MUST/SHOULD/COULD split** (§12.1):
-all three SHOULD-tier items (L1, L6, Wolfram verification) are done. L2
-(per-site rationale), L4 (grant packet), and L5 (analyst agent) remain
-explicitly COULD-tier/roadmap-only, not built in this pass.
+| Budget | CoolBlock (EWCB) | Best alternative (EWCB) | CoolBlock's lead |
+|---|---|---|---|
+| $20,000 | 4,057 | 1,182 (Tree Equity Score) | **3.4×** |
+| $50,000 | 11,775 | 8,182 (squeaky wheel) | **1.4×** |
+| $100,000 | 18,179 | 7,220 (Tree Equity Score) | **2.5×** |
 
-**Phase 13 (started)**: hardening. First concrete finding: the basemap's
-*tiles* were already self-hosted from local MinIO, but its labels
-(glyphs) and icons (sprite) were still loaded live from
-`protomaps.github.io` — meaning "disconnect the internet and run the
-entire demo" (Phase 13's own checkpoint) would have silently dropped
-every map label and icon, a real, judge-visible gap, not a hypothetical
-one. Fixed:
-[`docs/adr/0022-*.md`](docs/adr/0022-self-hosted-basemap-glyphs-and-sprite.md),
-`scripts/build_map_assets.sh` (a ~620KB one-time download of exactly the
-fontstacks/Unicode ranges this neighborhood's real labels need, matching
-`scripts/build_basemap.sh`'s own established self-hosting pattern). Found
-and fixed a real Windows/Docker bug along the way: a bind-mount with a
-plain Git-Bash POSIX path silently bound to nothing on this machine.
-**Second finding, same pass**: no error boundaries and no security
-headers existed at all. Added
-[`docs/adr/0023-*.md`](docs/adr/0023-error-boundaries-and-csp.md): a
-styled 404 (`not-found.tsx`), a route-level error boundary with a real
-"Try again" recovery action (`error.tsx`), a root-layout-crash fallback
-(`global-error.tsx`), and a CSP scoped to exactly the three local
-services the client actually talks to (audited, not guessed — the API,
-TiTiler, and MinIO). Disclosed tradeoff: `script-src`/`style-src` keep
-`'unsafe-inline'` for Next's own inline hydration scripts rather than
-building a nonce-based strict CSP unverifiable without a browser this
-session — confirmed via `curl` that every header applies correctly, but
-whether the map's WebGL rendering is CSP-clean needs a real browser
-check, flagged as the one open item. Also fixed a real bug found while
-in `next.config.ts`: the previous session's `NEXT_PUBLIC_MAP_ASSETS_URL`
-was never added to the explicit client-env allowlist, so an override in
-`.env` would have been silently ignored.
+Every plan above is **proven optimal** for its candidate pool, not just "the
+best CoolBlock found" — HiGHS proves it in under two seconds at every budget
+from $5,000 to $500,000. Full methodology, all five baselines, and the
+honest scope limits: [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md).
 
-**Third finding, with a real browser now in the loop**: building Phase
-13's E2E suite ([`docs/adr/0024-*.md`](docs/adr/0024-e2e-suite-and-four-real-bugs-it-found.md),
-`e2e/*.spec.ts`, `playwright.config.ts`) surfaced four real, independent
-bugs — none hypothetical, each confirmed by actually reproducing it:
-(1) the "Share link" button generated a URL for a page,
-`/share/[token]`, that never existed; (2) "Export GeoJSON"/"Export CSV"
-were plain `<a href>` links to a workspace-scoped endpoint, so a real
-browser click silently 404'd (a header-carrying `Blob` download, not a
-plain link, was the real fix); (3) CORS only ever allowed
-`localhost:3000`, so Next's own automatic fallback to 3001+ when 3000 is
-taken — which happened on this very machine mid-session, unprompted, from
-an unrelated project — broke every API call with no clear error; and
-(4) **the previous pass's own new CSP broke the optimizer entirely in
-`next dev`** (blocked `eval`, which Next's dev-mode HMR tooling needs,
-confirmed by reproducing the exact break and then confirming a
-production build has no such issue) — resolving `docs/adr/0023-*.md`'s
-own flagged "needs a real browser check" item, the hard way. All three
-E2E specs (the full journey, the share flow, the export flow — the
-reconnect flow is already covered at the API level,
-`test_solve_end_to_end.py`) now pass 6/6 against the real, full local
-stack.
+## How it decides
 
-Phase 13's much larger remaining scope (golden-file tests, a security
-audit beyond CSP, performance/bundle work, cross-browser testing) is
-untouched — these are three concrete slices, not a claim the phase is
-done.
+```mermaid
+flowchart LR
+    subgraph Offline["Offline, per neighborhood (once, ~20-90 min)"]
+        A["16 real data sources\n(Landsat, OSM, Census, CDC, parcels…)"] --> B["Heat surface\n(TsHARP downscaling, validated)"]
+        B --> C["Plantable candidates\n(public land, real costs)"]
+        C --> D["Impact & equity scoring\n(cooling kernel, shade, HVI)"]
+        D --> E[("data/derived/&lt;neighborhood&gt;\ncached, versioned")]
+    end
 
-**A fifth finding**: the user reported the live app's map "looks
-broken." A real screenshot (via a standalone `playwright` script, not an
-MCP connector) showed why — buildings rendered at near-opaque fill, and
-with 2,844 densely-packed buildings at the default pitched camera, their
-solid extruded walls visually hid almost the entire heat surface
-underneath, directly undermining §9 ★1's own "the surface glows beneath
-the 3D block." Every tile request had actually succeeded — confirmed via
-network capture — this was a rendering-value regression, not a broken
-pipeline. Fixed by halving building opacity across every honesty-rail
-tier; confirmed with a direct before/after screenshot comparison. See
-[`docs/adr/0025-*.md`](docs/adr/0025-building-opacity-was-hiding-the-heat-surface.md).
+    subgraph Live["Live, per request (~2s)"]
+        E --> F["Equity-weighted\ncoverage objective"]
+        F --> G{"Pool ≤ 1,000\ncandidates?"}
+        G -- yes --> H["Exact MILP (HiGHS)\nproven optimal"]
+        G -- no --> I["CELF greedy\n(1-1/√e) guarantee"]
+        H --> J["Ranked plan,\nstreamed site-by-site"]
+        I --> J
+    end
 
-**Phase 12 (started)**: the marketing site. `apps/web/app/page.tsx` was
-still the literal Phase 0 placeholder through every phase since — replaced
-with a real, static-generated one-pager using the "Field Instrument"
-light/editorial tokens the design system already declared: a hero image
-that is a genuine screenshot of the live product (not a mockup), four
-real stats, the five real cited papers with real DOI links, and an
-honest disclosure section — no fabricated claim anywhere on the page.
-Also fixed a real, silent gap found in the same pass: `--font-display`/`--font-ui`/`--font-mono`
-were plain fallback font-family stacks that were never actually loaded —
-every page in this app, including `/map`, has been silently rendering in
-system fallback fonts (Georgia/system-ui), not the design system's
-specified faces, this entire build. Fixed via `next/font/google`
-(self-hosted, no new CSP exception needed). See
-[`docs/adr/0026-*.md`](docs/adr/0026-marketing-site-real-one-pager.md).
+    J --> K["Map + table + export"]
+    J --> L["Council memo\n(LLM, numerically verified)"]
+```
 
-**Phase 12, §9.7 completed**: the scroll-driven 3D hero is real
-three.js/@react-three/fiber (`apps/web/app/HeatBlockScene.tsx`), a
-deterministic building grid over a ground plane that transitions between
-this project's own real thermal-ramp tokens as you scroll — lazily
-hydrated below the headline (confirmed the homepage bundle stayed at
-7.17 kB / 116 kB First Load JS), holding at a fixed frame under
-`prefers-reduced-motion` or a detected low-end device, per §9.7's own
-requirement. Verified with real screenshots at multiple scroll positions,
-not assumed from the code. Found and fixed a real crash along the way (a
-stale `.next` RSC cache after the new three.js dependencies landed,
-throwing a real error that tripped this app's own `global-error.tsx`) —
-and found, then deliberately reversed, a live-demo iframe embed of `/map`
-after it produced a real, embed-specific hydration mismatch plus a real
-backend-cost/GPU-contention concern; the live demo is a real screenshot
-and a direct link instead. See
-[`docs/adr/0027-*.md`](docs/adr/0027-scroll-driven-3d-hero.md).
+The optimizer never runs the 20–90 minute pipeline live — a request only ever
+triggers the fast re-solve over an already-scored candidate set. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full system diagram.
 
-## Quickstart
+## Tech stack
 
-Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12, [`uv`](https://docs.astral.sh/uv/),
-Docker Desktop (or a Docker daemon).
+| Layer | What |
+|---|---|
+| **Science engine** | Python (`engine/`) — geopandas/rasterio/rioxarray, scikit-learn (TsHARP downscaling), HiGHS (`highspy`) for the exact solver |
+| **API** | FastAPI, Postgres + PostGIS (plans, scenarios, sites), ARQ + Redis (job queue, SSE progress streaming) |
+| **Web** | Next.js 15 (React 19), Tailwind v4, MapLibre GL + deck.gl, three.js/@react-three/fiber (the homepage scene) |
+| **Shared** | TypeScript types generated from the FastAPI OpenAPI schema (`packages/schema`) — never hand-written |
+| **Intelligence** | Claude (or Groq fallback) drafts the council memo; every number it states is extracted and checked against the real computed data before rendering |
+
+## Repo layout
+
+```
+coolblock/
+├─ apps/web/       Next.js — marketing homepage + the live app
+├─ apps/api/       FastAPI — REST + SSE + job control
+├─ packages/ui/    design system: tokens, primitives
+├─ packages/map/   MapLibre + deck.gl layer library
+├─ packages/schema/ shared TS types generated from the API's OpenAPI schema
+├─ engine/         the science — an installable Python package
+├─ data/           versioned cache + derived pipeline outputs
+├─ config/         neighborhood.toml — the scope lock
+├─ notebooks/      validation + calibration, committed with real outputs
+└─ docs/           architecture, methodology, data sources, ADRs, deployment
+```
+
+## Quickstart (local)
+
+Prerequisites: Node ≥ 20, pnpm ≥ 9, Python 3.11–3.12,
+[`uv`](https://docs.astral.sh/uv/), Docker Desktop (or a Docker daemon).
 
 ```bash
 cp .env.example .env
 make dev
 ```
 
-This brings up Postgres+PostGIS+pgvector, Redis, MinIO (a local stand-in for
+This brings up Postgres+PostGIS, Redis, MinIO (a local stand-in for
 Cloudflare R2), and TiTiler via Docker Compose, installs JS and Python
 dependencies, and starts the Next.js app + FastAPI dev servers.
 
-- Web: http://localhost:3000
-- Map: http://localhost:3000/map (first run: `uv run python scripts/export_map_layers.py`,
-  `bash scripts/build_basemap.sh`, and `uv run python scripts/export_heat_surface.py`
-  to populate `data/derived/edison-eastlake/` and MinIO)
-- API: http://localhost:8000/health
-- MinIO console: http://localhost:9001
+- Web: <http://localhost:3000>
+- Map: <http://localhost:3000/map> — the derived data needed to run it is
+  already committed under `data/derived/edison-eastlake/`
+  ([`docs/adr/0030-*.md`](docs/adr/0030-derived-data-committed-owner-names-stripped.md)); to regenerate it yourself, run
+  `uv run python scripts/export_map_layers.py`, `bash scripts/build_basemap.sh`,
+  and `uv run python scripts/export_heat_surface.py`
+- API: <http://localhost:8000/health>
+- MinIO console: <http://localhost:9001>
 
-If port 8000 is already taken by something else on your machine, run
-`API_PORT=8001 make dev` and update `NEXT_PUBLIC_API_URL` in `.env` to match.
-
-**No `make` on Windows?** Install it (`choco install make` or `scoop install make`)
-or run the Makefile's steps directly: `docker compose up -d --wait`, then
-`pnpm install && uv sync --all-packages --all-extras`, then `bash scripts/dev.sh`.
-
-Individual pieces:
+**No `make` on Windows?** Install it (`choco install make` or
+`scoop install make`), or run the Makefile's steps directly:
+`docker compose up -d --wait`, then `pnpm install && uv sync --all-packages --all-extras`,
+then `bash scripts/dev.sh`.
 
 ```bash
 make up          # infra only (Postgres, Redis, MinIO, TiTiler)
@@ -284,31 +158,37 @@ make install      # JS + Python deps
 make lint         # ESLint + ruff
 make typecheck    # tsc --noEmit + mypy
 make test         # JS + Python test suites
-make ingest       # engine.ingest — Phase 1
 ```
 
-## Repo layout
+Full instructions and what to click to verify each piece actually works:
+[`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md).
 
-See COOLBLOCK-BUILD-PLAN.md §3.4 for the annotated version.
+## Deploying this yourself
 
-```
-coolblock/
-├─ apps/web/       Next.js 15 — marketing + app
-├─ apps/api/       FastAPI — REST + SSE + job control
-├─ packages/ui/     design system: tokens, primitives, motion
-├─ packages/map/    MapLibre + deck.gl layer library
-├─ packages/schema/ shared TS types generated from Pydantic/OpenAPI
-├─ engine/          the science — installable Python package
-├─ data/            versioned cache + derived pipeline outputs
-├─ config/          neighborhood.toml — the scope lock
-├─ notebooks/       validation + calibration, committed with outputs
-└─ docs/            architecture, methodology, data sources, ADRs
-```
+A step-by-step guide to running this for real on free-tier hosting (Vercel +
+Neon + Render): [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+## Docs
+
+| Doc | What's in it |
+|---|---|
+| [`docs/GUIDE.md`](docs/GUIDE.md) | What problem this solves, why it matters, and an honest answer to "is this actually solving it?" |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System diagram, the three runtime paths, agent lanes |
+| [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) | Every model, every calibration, every disclosed limitation, with real numbers |
+| [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md) | All 16 data sources, what each gives, how it's accessed |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deploying to Vercel + Neon + Render, step by step |
+| [`docs/RUNNING-AND-TESTING.md`](docs/RUNNING-AND-TESTING.md) | Running it locally and verifying every feature actually works |
+| [`docs/BUILD-LOG.md`](docs/BUILD-LOG.md) | The phase-by-phase engineering diary — what broke, what was found, what was fixed |
+| [`docs/adr/`](docs/adr/) | One file per architecture decision, never edited after acceptance |
+| [`COOLBLOCK-BUILD-PLAN.md`](COOLBLOCK-BUILD-PLAN.md) | The original full design and phase plan |
 
 ## The No-Fake Rule
 
 Nothing in CoolBlock is simulated for effect — no hardcoded "results," no
 artificial delays, no placeholder charts, no dead buttons. The one sanctioned
 exception is demo-mode: cached artifacts of real data, computed by the real
-pipeline, frozen for reproducibility and labeled as such. See
-COOLBLOCK-BUILD-PLAN.md §1.1.
+pipeline, frozen for reproducibility and labeled as such.
+
+## License
+
+[MIT](LICENSE).

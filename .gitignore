@@ -38,6 +38,48 @@ data/derived/*
 *.parquet
 *.pmtiles
 
+# Exception: the locked demo neighborhood's own derived outputs (~15 MB,
+# docs/adr/0030-*.md). These are what the deployed app actually reads at
+# request time (engine/optimize/plan_service.py's own docstring: it reads
+# the cache, it never recomputes the 20-90 min cold pipeline live) -- a
+# production deploy with no persistent volume and no source-data
+# credentials has nowhere else to get them. Regenerable from real sources
+# via `uv run python scripts/export_map_layers.py` /
+# `export_heat_surface.py`; committed here so a fresh clone or a fresh
+# Render deploy can run without that ~20-90 min ingest first. Scrubbed of
+# `owner_name` before export (private parcel-owner names never belong in
+# a public repo) -- everything else here is already public government/
+# open data (Census, CDC, OSM, Landsat, Sentinel-2, Maricopa County
+# parcels by APN, not by owner).
+#
+# `population_scored.geojson` (docs/adr/0032-*.md) is the one file in
+# here that exists *only* because a deploy target must never need
+# `data/cache/maricopa_parcels/` (real names + home addresses) just to
+# answer a solve request -- it is not a map layer like the rest.
+!data/derived/edison-eastlake/
+!data/derived/edison-eastlake/*.geojson
+!data/derived/edison-eastlake/*.tif
+!data/derived/edison-eastlake/*.pmtiles
+
+# Same reasoning, for the three raw-cache sources request-time code still
+# reads directly (docs/adr/0032-*.md): Census block-group boundaries
+# (TIGER), Census ACS5 block-group aggregates, and Tree Equity Score by
+# block group -- all public government open data at block-group
+# granularity (never an individual record), unlike `maricopa_parcels`
+# (excluded on purpose, real names + home addresses -- never committed).
+!data/cache/tiger_block_groups/
+!data/cache/tiger_block_groups/**/block_groups.parquet
+!data/cache/census_acs5/
+!data/cache/census_acs5/**/acs5_block_groups.parquet
+!data/cache/tree_equity_score/
+!data/cache/tree_equity_score/**/tes_block_groups.parquet
+
+# --- Hackathon-process meta-docs: strategy brainstorming and competitor
+# research, not project documentation. Never on git -- see docs/GUIDE.md
+# and docs/ARCHITECTURE.md for the real, public project docs instead. ---
+outputs/
+docs/DEVPOST-COMPETITOR-RESEARCH.md
+
 # --- Editors / OS ---
 .vscode/*
 !.vscode/extensions.json

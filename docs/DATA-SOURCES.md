@@ -1,6 +1,6 @@
 # CoolBlock — Data sources
 
-> Status: Phase 1 in progress, tracking COOLBLOCK-BUILD-PLAN.md §5. Every row
+> Status: complete (all 16 sources ingested; Phase 1, COOLBLOCK-BUILD-PLAN.md §5). Every row
 > below reflects a real ingest run against the locked bbox
 > (`config/neighborhood.toml`), not a plan. The
 > `data/cache/<source>/<version>/manifest.json` written by each ingest

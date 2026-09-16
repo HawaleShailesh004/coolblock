@@ -3,7 +3,8 @@
 Everything below has actually been run during Phases 0–4 — this isn't a
 theoretical quickstart, it's the exact sequence used to verify each phase.
 If a step doesn't match what you see, that's a real bug worth reporting,
-not "works on my machine."
+not "works on my machine." Deploying this somewhere other than your own
+machine: [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## 1. Prerequisites
 
