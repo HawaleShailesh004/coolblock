@@ -9,10 +9,12 @@ plans")."""
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 
 import anthropic
 import groq
+import httpx
 from engine.narrate.constraints_nl import ConstraintParseError, parse_constraints
 from engine.optimize.plan_service import SolveParams
 from engine.optimize.programs import DEFAULT_PROGRAM, DEFAULT_PUBLIC_LAND_ONLY
@@ -35,9 +37,39 @@ from coolblock_api.schemas import (
     PlanUpdate,
     ScenarioVersionOut,
 )
+from coolblock_api.settings import get_settings
 from coolblock_api.workspace import get_current_workspace
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/plans", tags=["plans"])
+
+# Strong references to in-flight wake pings. asyncio only holds a weak
+# reference to a running task, so without this the garbage collector can
+# cancel the ping mid-flight before the worker ever answers.
+_wake_tasks: set[asyncio.Task[None]] = set()
+
+
+async def _ping_worker(url: str, timeout_s: float) -> None:
+    """Best-effort GET at the worker's port stub, to bring a sleeping
+    free-tier instance back up (see `Settings.worker_wake_url`). The solve is
+    already queued before this runs, so a failed ping only means the job waits
+    for the worker to wake some other way -- it must never surface as a solve
+    error."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            await client.get(url)
+    except Exception:
+        logger.warning("worker wake ping failed", extra={"worker_wake_url": url}, exc_info=True)
+
+
+def _wake_worker_if_configured() -> None:
+    settings = get_settings()
+    if not settings.worker_wake_url:
+        return
+    task = asyncio.create_task(_ping_worker(settings.worker_wake_url, settings.worker_wake_timeout_s))
+    _wake_tasks.add(task)
+    task.add_done_callback(_wake_tasks.discard)
 
 
 def _get_plan_or_404(db: Session, workspace: Workspace, plan_id: uuid.UUID) -> Plan:
@@ -204,5 +236,6 @@ async def solve_plan(
 
     pool = await get_arq_pool()
     await pool.enqueue_job("run_plan_solve", str(scenario_version.id), params, _job_id=job_id)
+    _wake_worker_if_configured()
 
     return scenario_version

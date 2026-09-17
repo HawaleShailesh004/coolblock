@@ -117,6 +117,7 @@ works without them.
   | `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | optional — only needed for the council-memo feature                                                                                                                                                                                                                                                 |
   | `MEMO_LLM_PROVIDER`                  | `anthropic` or `groq`, matching whichever key you set                                                                                                                                                                                                                                               |
   | `SENTRY_DSN`                         | optional                                                                                                                                                                                                                                                                                            |
+  | `WORKER_WAKE_URL`                    | `https://<your-render-worker>.onrender.com/` — **set this after step 4.** Without it, a solve queued while the worker is asleep sits pending forever and the UI hangs on "Solving… site 0" with no error (see `docs/adr/0034-*.md`, third addendum)                                                |
 
    Leave `CLERK_SECRET_KEY`/`CLERK_JWKS_URL`/`CLERK_ISSUER` unset — see
    "Known limitations."
@@ -164,6 +165,17 @@ the ARQ worker itself still does no HTTP work.
 5. Confirm the stub answers (this is *not* the real API — it only proves
    the process is alive): `curl https://<your-render-worker>.onrender.com/`.
    Verify the worker itself actually works by running a real solve (step 7).
+6. **Go back to step 3's service and set `WORKER_WAKE_URL` to this
+   worker's URL** (trailing slash is fine), then redeploy the API. This is
+   not optional polish: a free Web Service sleeps after ~15 minutes with no
+   inbound HTTP, and nothing ever calls the worker — it pulls jobs from
+   Redis. A sleeping worker leaves every queued solve pending forever, with
+   no error anywhere, which is precisely what a judge opening the live demo
+   after an idle period would hit. With it set, the solve request itself
+   wakes the worker (a detached best-effort ping; the `202` still returns
+   immediately). Expect the first solve after an idle period to take an
+   extra ~20-25s while the worker boots. See `docs/adr/0034-*.md`, third
+   addendum.
 
 
 

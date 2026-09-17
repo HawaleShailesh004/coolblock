@@ -73,6 +73,26 @@ class Settings(BaseSettings):
 
     solve_rate_limit_per_minute: int = 10
 
+    # Render's free tier has no Background Worker type (docs/adr/0034-*.md),
+    # so the ARQ worker runs as an ordinary free Web Service held up by a port
+    # stub. Free Web Services sleep after ~15 minutes without inbound HTTP --
+    # and nothing ever calls the worker, because it pulls jobs from Redis
+    # rather than serving requests. A sleeping worker never drains the queue,
+    # so every solve sits `pending` forever and the UI shows "Solving... site
+    # 0" with no error and no timeout. That is exactly what a judge opening
+    # the live demo after an idle period sees, and it is how this was found:
+    # a recorded demo run hung for 175s until the worker URL was hit by hand.
+    #
+    # Set this to the worker service's public URL and a solve request pings it
+    # first, waking it if it was asleep. Deliberately wake-on-demand rather
+    # than a keepalive cron: Render's free plan allows 750 instance-hours a
+    # month, which covers one always-on service, not two, so pinning the
+    # worker awake would starve the API instead. The cost is a one-off ~20-25s
+    # wake on the first solve after an idle period -- real, bounded, and
+    # visible in the UI's own progress stream, not hidden.
+    worker_wake_url: str = ""
+    worker_wake_timeout_s: float = 30.0
+
     @property
     def cors_allow_origins_list(self) -> list[str]:
         """What `coolblock_api.main`'s `CORSMiddleware` actually reads.

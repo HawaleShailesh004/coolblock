@@ -105,3 +105,44 @@ a plain 200 on every path, alongside the real ARQ worker — a few MB, not
 the ~270 MB the real API app would cost if used for this instead, which
 would have quietly re-created the exact memory problem this whole ADR
 exists to fix. `docs/DEPLOYMENT.md` step 4 updated accordingly.
+
+## Third addendum: the port stub keeps Render happy but lets the worker sleep
+
+Found while recording the demo video, not by a test: a real solve on the
+live site hung at `Solving... · site 0 · $0 of $50,000` for **175 seconds**
+with no error and no timeout. Hitting `https://coolblock-1.onrender.com/`
+by hand answered `200` after **22.4s** — the classic free-tier cold start —
+and the very next solve completed normally in about 25s.
+
+The port stub from the second addendum satisfies Render's *deploy-time*
+port scan, but it does nothing about Render's *runtime* idle policy: a free
+Web Service spins down after ~15 minutes with no inbound HTTP request. The
+worker never receives inbound HTTP by design — it pulls jobs from Redis —
+so it reliably falls asleep and then never wakes, because nothing is
+calling it. Queued jobs simply sit in Redis. The API stays up (it gets real
+traffic), the enqueue succeeds, the SSE stream opens, and the UI waits
+forever on a job no process will ever pick up.
+
+This is worse than a crash: there is no error anywhere. The first three
+demo-video takes were all silently recording a hung solve.
+
+**Decision: wake the worker from the API's own solve path.** `POST
+/plans/{id}/solve` now fires a best-effort GET at `WORKER_WAKE_URL`
+(`Settings.worker_wake_url`) immediately after enqueuing, as a detached
+task so the `202` still returns at once. If the worker was asleep the ping
+wakes it and it drains the queue; if it was already awake the ping is a
+~300ms no-op; if the ping fails the job is still queued and nothing about
+the request changes.
+
+Rejected: a keepalive cron pinging the worker every ~10 minutes. Render's
+free plan grants 750 instance-hours per month, which covers **one**
+always-on service, not two — holding the worker awake would starve the API
+of the hours it needs. Wake-on-demand spends the cold start only when there
+is actually a job to run.
+
+Accepted cost, stated rather than hidden: the first solve after an idle
+period takes roughly 20-25s longer while the worker boots. That is real,
+bounded, and already visible in the UI's own progress stream. The honest
+framing for a judge is that this is a free-tier hosting property, not an
+optimizer property — the solve itself is still the ~2s proven-optimal run
+`docs/adr/0028-*.md` describes.

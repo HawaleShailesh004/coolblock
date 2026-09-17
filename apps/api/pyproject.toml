@@ -14,6 +14,10 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.13",
     "arq>=0.26",
+    # Already present transitively via the anthropic/groq SDKs; declared
+    # explicitly because the solve path imports it directly to wake the
+    # worker (see Settings.worker_wake_url).
+    "httpx>=0.27",
     "redis>=5.1",
     "python-dotenv>=1.0",
     "structlog>=24.4",
