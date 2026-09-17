@@ -14,7 +14,7 @@ flowchart LR
     RenderTitiler -->|"reads the COG via a\nplain https:// URL"| Vercel
     RenderAPI --> Neon[("Neon\nPostgres 16 + PostGIS")]
     RenderAPI --> Upstash[("Upstash\nRedis — the ARQ job queue")]
-    RenderWorker["Render (free)\nBackground Worker -- PROCESS_ROLE=worker"] --> Neon
+    RenderWorker["Render (free)\nARQ worker + port stub\n-- PROCESS_ROLE=worker"] --> Neon
     RenderWorker --> Upstash
 ```
 
@@ -33,8 +33,7 @@ surface's dynamic tiles, but reads the COG from that same Vercel URL over
 plain HTTPS — no S3 credentials needed anywhere in production.
 
 **The API and the ARQ worker are two separate Render services from the
-same image**, not one -- a **Web Service** for the API, a **Background
-Worker** for the ARQ worker, not two Web Services — `apps/api/start.sh` can run either alone
+same image**, not one — `apps/api/start.sh` can run either alone
 (`PROCESS_ROLE=api` / `PROCESS_ROLE=worker`) or both together
 (`PROCESS_ROLE` unset). Running both together in one container was the
 original design here and it does not fit Render's free 512 MB limit under
@@ -42,8 +41,11 @@ real load: measured directly, the API alone uses ~276 MB and the worker
 alone ~263 MB — already ~539 MB combined at rest, before a real solve's own
 peak usage, and a real deploy in that mode crash-looped every few minutes
 (`docs/adr/0034-*.md`). Two services, each comfortably under the limit on
-its own, is the fix — not a simplification, the two-Render-service shape
-below is the one to actually use.
+its own, is the fix. Both are Render **Web Services** — the free tier
+turned out to have no *Background Worker* service type after all
+(confirmed against the real dashboard), so the worker service satisfies
+Render's port requirement with a trivial stdlib-only stub
+(`coolblock_api.worker_stub`, a few MB) instead, not with the real API.
 
 ## Before you start
 
@@ -133,32 +135,35 @@ This is what actually runs a solve — without it, `/plans/{id}/solve`
 enqueues a job that sits at `"pending"`/`"running"` forever, since nothing
 ever consumes the queue.
 
-1. **New → Background Worker** — **not** "Web Service". This is not
-   optional: `PROCESS_ROLE=worker` never binds a port on purpose (there's
-   no HTTP traffic for it to serve), and a Render **Web Service**
-   requires one — its port-scanner waits ~5 minutes for something to
-   listen, times out, and fails the deploy with exactly this error:
-   `No open ports detected ... create a background worker instead`.
-   That's Render's own error message telling you the fix. A **Background
-   Worker** is a real, separate Render service type made for exactly
-   this (still free-tier eligible) — it never scans for a port at all.
-2. Same GitHub repo, same Dockerfile settings as step 3 (Docker,
-   `apps/api/Dockerfile`, context `.`, instance **Free**).
-3. Environment variables: the same `DATABASE_URL`/`REDIS_URL` as step 3,
-  plus:
+Render's **Background Worker** service type is the obvious fit here (a
+long-running process with no inbound HTTP) — but on the free tier it
+isn't actually offered (confirmed against the real dashboard). So this is
+a **Web Service** after all, same as step 3, with one difference: in
+`PROCESS_ROLE=worker` mode, `start.sh` also starts a trivial stdlib-only
+HTTP stub (`coolblock_api.worker_stub`, a few MB, not the ~270 MB the
+full API app would add) purely to satisfy Render's port requirement —
+the ARQ worker itself still does no HTTP work.
 
-  | Key                | Value                                                      |
-  | ------------------ | ---------------------------------------------------------- |
-  | `PROCESS_ROLE`     | `worker` (**required**)                                    |
-  | `ARQ_POLL_DELAY_S` | `5` (see step 2's own note — this is the setting it's for) |
+1. **New → Web Service**, same GitHub repo, same Dockerfile settings as
+   step 3 (Docker, `apps/api/Dockerfile`, context `.`, instance **Free**).
+2. Health check path: leave it unset, or `/` — the stub answers every
+   path with a plain 200.
+3. Environment variables: the same `DATABASE_URL`/`REDIS_URL` as step 3,
+   plus:
+
+   | Key | Value |
+   |---|---|
+   | `PROCESS_ROLE` | `worker` (**required**) |
+   | `ARQ_POLL_DELAY_S` | `5` (see step 2's own note — this is the setting it's for) |
 
    `CORS_ALLOW_ORIGINS`, `ANTHROPIC_API_KEY`, etc. aren't read by this
    process; harmless to leave unset here.
-4. Deploy. Logs should show `Starting worker for 1 functions:
-   run_plan_solve` and `redis_version=...` — no migrations, no uvicorn,
-   and (unlike a Web Service) no "No open ports detected" scan at all.
-5. This service intentionally answers no HTTP requests — there's nothing
-   to `curl`. Verify it by running a real solve (step 7) instead.
+4. Deploy. Logs should show both `Starting stub HTTP listener on port
+   ...` and `Starting worker for 1 functions: run_plan_solve` /
+   `redis_version=...` — no migrations, no uvicorn.
+5. Confirm the stub answers (this is *not* the real API — it only proves
+   the process is alive): `curl https://<your-render-worker>.onrender.com/`.
+   Verify the worker itself actually works by running a real solve (step 7).
 
 
 

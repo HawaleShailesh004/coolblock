@@ -85,9 +85,23 @@ naming the type). It failed:
 traffic for it to serve — but a Render **Web Service** requires one
 regardless of what the container actually does, and fails the deploy
 after a ~5-minute port scan if nothing ever listens. Render's own error
-message names the fix directly: a **Background Worker** is a distinct,
-still-free-tier-eligible Render service type made for exactly this (a
-long-running process with no inbound HTTP), and it never runs a port
-scan at all. `docs/DEPLOYMENT.md` step 4 now says **Background Worker**
-explicitly, with this exact failure quoted, rather than "a second free
-service" left to guess at.
+message names the fix directly: a **Background Worker** is a distinct
+Render service type made for exactly this (a long-running process with
+no inbound HTTP), and it never runs a port scan at all.
+
+## Second addendum: Background Worker isn't on Render's free tier either
+
+The user tried exactly that, on the real Render dashboard, and reported
+back: no Background Worker option is offered on the free plan — only Web
+Services. (Not something either this ADR's first addendum or
+`docs/DEPLOYMENT.md` had actually confirmed; both assumed Render's own
+"create a background worker instead" message meant that path was open
+here specifically, rather than checking the free tier's own limits.)
+
+So the worker service stays a **Web Service** after all, and satisfies
+Render's port requirement a different way: `PROCESS_ROLE=worker` now also
+starts `coolblock_api.worker_stub`, a stdlib-only `http.server` answering
+a plain 200 on every path, alongside the real ARQ worker — a few MB, not
+the ~270 MB the real API app would cost if used for this instead, which
+would have quietly re-created the exact memory problem this whole ADR
+exists to fix. `docs/DEPLOYMENT.md` step 4 updated accordingly.

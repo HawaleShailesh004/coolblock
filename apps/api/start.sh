@@ -3,7 +3,16 @@
 # (docs/adr/0034-*.md). Three modes:
 #
 #   PROCESS_ROLE=api     Migrations + the FastAPI server alone.
-#   PROCESS_ROLE=worker  The ARQ worker alone, no migrations, no port.
+#   PROCESS_ROLE=worker  The ARQ worker, plus a trivial stub HTTP listener
+#                        on $PORT (docs/adr/0034-*.md's addendum) -- Render's
+#                        free tier turned out to have no Background Worker
+#                        service type (confirmed against the real
+#                        dashboard), only Web Services, which require a
+#                        bound port regardless of what the process does.
+#                        `coolblock_api.worker_stub` is stdlib-only and
+#                        adds only a few MB, not the ~270 MB the full API
+#                        app would -- the whole point of this split was
+#                        memory, so the stub can't quietly undo it.
 #   (unset / "both")     Both together, one container -- the ORIGINAL
 #                        design (docs/adr/0031-*.md), kept for local
 #                        `docker run` convenience only. **Do not use this
@@ -44,8 +53,18 @@ case "$ROLE" in
     exec uvicorn coolblock_api.main:app --host 0.0.0.0 --port "${PORT:-8000}"
     ;;
   worker)
+    echo "==> Starting stub HTTP listener on port ${PORT:-8000} (Render port requirement only)"
+    python -m coolblock_api.worker_stub &
+    STUB_PID=$!
+
     echo "==> Starting ARQ worker"
-    exec arq coolblock_api.jobs.worker.WorkerSettings
+    arq coolblock_api.jobs.worker.WorkerSettings &
+    WORKER_PID=$!
+
+    # Either one dying takes the container down -- see the "both" case
+    # below for why that's deliberate, not an oversight.
+    trap 'kill "$STUB_PID" "$WORKER_PID" 2>/dev/null || true' EXIT INT TERM
+    wait -n "$STUB_PID" "$WORKER_PID"
     ;;
   both)
     # `wait -n` exits this script the moment EITHER process exits, so a
