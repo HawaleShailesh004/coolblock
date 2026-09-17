@@ -66,3 +66,28 @@ step 4), not offered as an optional split.
   *survives inside the resource ceiling the real host actually
   enforces* — worth remembering for anything deployed to a
   memory-constrained free tier again.
+
+## Addendum: the worker needs Render's *Background Worker* service type
+
+The first attempt to actually deploy this split, from the user's own
+Render dashboard, used **New → Web Service** for the worker (following
+this doc's own first draft, which said "a second free service" without
+naming the type). It failed:
+
+```
+==> No open ports detected, continuing to scan...
+==> Port scan timeout reached, no open ports detected. Bind your service
+    to at least one port. If you don't need to receive traffic on any
+    port, create a background worker instead.
+```
+
+`PROCESS_ROLE=worker` deliberately never binds a port — there's no HTTP
+traffic for it to serve — but a Render **Web Service** requires one
+regardless of what the container actually does, and fails the deploy
+after a ~5-minute port scan if nothing ever listens. Render's own error
+message names the fix directly: a **Background Worker** is a distinct,
+still-free-tier-eligible Render service type made for exactly this (a
+long-running process with no inbound HTTP), and it never runs a port
+scan at all. `docs/DEPLOYMENT.md` step 4 now says **Background Worker**
+explicitly, with this exact failure quoted, rather than "a second free
+service" left to guess at.
