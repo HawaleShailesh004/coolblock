@@ -96,7 +96,7 @@ local dev:
    | `REDIS_URL` | the Upstash `rediss://…` string from step 2 |
    | `ARQ_POLL_DELAY_S` | `5` |
    | `ENVIRONMENT` | `staging` (**not** `production` — see "Known limitations" below for why) |
-   | `CORS_ALLOW_ORIGINS` | `["https://<your-project>.vercel.app"]` (a JSON array; you'll know this URL after step 5 — Render lets you edit env vars and redeploy any time) |
+   | `CORS_ALLOW_ORIGINS` | `https://<your-project>.vercel.app` (plain, or comma-separated for more than one; a JSON array also works — you'll know this URL after step 5, Render lets you edit env vars and redeploy any time; leaving it unset for now is fine too, it falls back to allowing only localhost, not to a crash) |
    | `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | optional — only needed for the council-memo feature |
    | `MEMO_LLM_PROVIDER` | `anthropic` or `groq`, matching whichever key you set |
    | `SENTRY_DSN` | optional |
@@ -158,9 +158,9 @@ unset and that one layer won't render.
    keeps these stable across redeploys — recommended if you have one.)
 4. Deploy.
 5. Go back to Render (step 3) and set `CORS_ALLOW_ORIGINS` to this exact
-   Vercel URL (as a JSON array, e.g. `["https://coolblock.vercel.app"]`),
-   then redeploy that service — without this, every API call from the
-   deployed frontend fails as an opaque CORS error.
+   Vercel URL (plain, e.g. `https://coolblock.vercel.app`), then redeploy
+   that service — without this, every API call from the deployed
+   frontend fails as an opaque CORS error.
 
 ## 6. Verify it for real
 

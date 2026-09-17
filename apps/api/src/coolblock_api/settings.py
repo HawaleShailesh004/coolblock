@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 
@@ -50,14 +51,50 @@ class Settings(BaseSettings):
     # environment where port 3000 might already be occupied. Widened to
     # the handful of ports Next actually tries before giving up, not to
     # "*" -- still a real, closed allowlist. Override via CORS_ALLOW_ORIGINS
-    # (JSON array) in .env for anything else.
-    cors_allow_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-    ]
+    # in .env / a host's dashboard for anything else.
+    #
+    # **Deliberately `str`, not `list[str]`.** A second real gap, this one
+    # a live production failure (Render), not caught locally first:
+    # pydantic-settings treats a `list[str]`-typed env var as "complex"
+    # and unconditionally JSON-decodes it *inside its own env-source
+    # machinery* -- before any field validator on this class ever runs,
+    # so a `mode="before"` validator on a `list[str]` field cannot
+    # intercept or recover from this. A dashboard box holding the bare
+    # URL someone naturally types (`https://example.com`), or one left
+    # genuinely empty (this project's own DEPLOYMENT.md said to fill this
+    # in only after a first deploy revealed the real Vercel URL), both
+    # crash the app at boot with an opaque SettingsError/JSONDecodeError,
+    # before a single request is served. Typing it as `str` here removes
+    # it from pydantic-settings' complex-type path entirely; parsing
+    # happens in `cors_allow_origins_list` below instead, where it can
+    # actually handle a JSON array, a plain comma-separated list, or
+    # nothing at all.
+    cors_allow_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
 
     solve_rate_limit_per_minute: int = 10
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        """What `coolblock_api.main`'s `CORSMiddleware` actually reads.
+        Accepts the JSON-array form this project originally documented
+        (`["https://example.com"]`) *and* a plain comma-separated string
+        (what a person actually types into a host's env-var box) *and* a
+        blank value (this field's own default local origins, not an
+        empty allowlist that would silently reject every real request
+        with no clear error)."""
+        stripped = self.cors_allow_origins.strip()
+        if not stripped:
+            default = self.model_fields["cors_allow_origins"].default
+            return [origin.strip() for origin in default.split(",") if origin.strip()]
+        if stripped.startswith("["):
+            try:
+                decoded = json.loads(stripped)
+            except json.JSONDecodeError:
+                pass
+            else:
+                if isinstance(decoded, list):
+                    return [str(origin) for origin in decoded]
+        return [origin.strip() for origin in stripped.split(",") if origin.strip()]
 
     @property
     def auth_is_dev_fallback(self) -> bool:
