@@ -61,6 +61,15 @@ data/derived/*
 !data/derived/edison-eastlake/*.tif
 !data/derived/edison-eastlake/*.pmtiles
 
+# Same files, second copy: apps/web/public/tiles/ is what Vercel actually
+# serves them from (docs/adr/0031-*.md). A real, live bug -- these two
+# extensions' blanket ignore rules above silently dropped basemap.pmtiles
+# and both heat-surface .tif files from git at push time even though
+# `git add` reported no error, so the deployed map's basemap and heat
+# layer were both broken until this was caught testing the live site.
+!apps/web/public/tiles/*.pmtiles
+!apps/web/public/tiles/*.tif
+
 # Same reasoning, for the three raw-cache sources request-time code still
 # reads directly (docs/adr/0032-*.md): Census block-group boundaries
 # (TIGER), Census ACS5 block-group aggregates, and Tree Equity Score by
