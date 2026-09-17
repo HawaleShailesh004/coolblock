@@ -1,8 +1,13 @@
-# Builds the FastAPI service (and, via start.sh, the ARQ worker in the same
-# container) for a single free-tier host (docs/DEPLOYMENT.md) that gives one
-# process slot per service. Build context is the REPO ROOT, not apps/api/ --
-# `coolblock-engine` (the `engine/` package) is a uv workspace root dependency
-# of `coolblock-api` (apps/api/pyproject.toml's `[tool.uv.sources]`), and
+# Builds the FastAPI service and the ARQ worker as ONE image that runs as
+# TWO separate Render services (docs/adr/0034-*.md), each set to a different
+# $PROCESS_ROLE (api / worker) -- not one container running both, which a
+# real production deploy crash-looped every few minutes under an actual
+# solve's memory load (measured: ~276 MB + ~263 MB apart, comfortably under
+# Render free's 512 MB each; combined, already over 512 MB before a solve's
+# own peak usage). See start.sh for the three modes. Build context is the
+# REPO ROOT, not apps/api/ -- `coolblock-engine` (the `engine/` package) is a
+# uv workspace root dependency of `coolblock-api`
+# (apps/api/pyproject.toml's `[tool.uv.sources]`), and
 # `data/derived/edison-eastlake/` (docs/adr/0030-*.md) is what the app reads
 # at request time -- both have to be in the build context, so a plain
 # `apps/api/` context can't build this image.

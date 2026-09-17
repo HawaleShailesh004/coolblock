@@ -1,6 +1,6 @@
 # Deploying CoolBlock for real, on free tiers
 
-This deploys the actual app — not a simplified stand-in — across four free
+This deploys the actual app — not a simplified stand-in — across five free
 services. It takes about 30–45 minutes the first time. Do the steps in
 order; several later steps need a URL a previous step produces.
 
@@ -9,26 +9,38 @@ order; several later steps need a URL a previous step produces.
 ```mermaid
 flowchart LR
     Visitor(("Judge / visitor's\nbrowser")) --> Vercel["Vercel\napps/web (Next.js)\n+ static map tiles"]
-    Vercel -->|"solve requests,\nSSE progress"| RenderAPI["Render (free)\nFastAPI + ARQ worker,\none Docker image"]
+    Vercel -->|"solve requests,\nSSE progress"| RenderAPI["Render (free)\nFastAPI -- PROCESS_ROLE=api"]
     Vercel -->|"heat surface tiles"| RenderTitiler["Render (free)\nTiTiler"]
     RenderTitiler -->|"reads the COG via a\nplain https:// URL"| Vercel
     RenderAPI --> Neon[("Neon\nPostgres 16 + PostGIS")]
     RenderAPI --> Upstash[("Upstash\nRedis — the ARQ job queue")]
+    RenderWorker["Render (free)\nARQ worker -- PROCESS_ROLE=worker"] --> Neon
+    RenderWorker --> Upstash
 ```
 
-Why four services and not one: the app genuinely has four different
-concerns (a database, a job queue, a tile-rendering service, and the web
-app itself) — this reflects the real architecture rather than hiding it.
-Two simplifications already folded in, versus running this exactly like
-local dev:
+Why five services and not one: the app genuinely has five different
+concerns (a database, a job queue, the job queue's own consumer, a
+tile-rendering service, and the web app itself) — this reflects the real
+architecture rather than hiding it. One simplification is folded in,
+versus running this exactly like local dev:
 
-- **The API and the ARQ worker share one Render service** (one process
-  slot on a free instance runs both — see `apps/api/start.sh`), not two.
 - **The basemap tiles, glyphs, sprite, and heat-surface COG are served as
   plain static files from Vercel** (`apps/web/public/tiles/`, already
   committed), not from Cloudflare R2/MinIO. TiTiler still renders the heat
   surface's dynamic tiles, but reads the COG from that same Vercel URL over
   plain HTTPS — no S3 credentials needed anywhere in production.
+
+**The API and the ARQ worker are two separate Render services from the
+same image**, not one — `apps/api/start.sh` can run either alone
+(`PROCESS_ROLE=api` / `PROCESS_ROLE=worker`) or both together
+(`PROCESS_ROLE` unset). Running both together in one container was the
+original design here and it does not fit Render's free 512 MB limit under
+real load: measured directly, the API alone uses ~276 MB and the worker
+alone ~263 MB — already ~539 MB combined at rest, before a real solve's own
+peak usage, and a real deploy in that mode crash-looped every few minutes
+(`docs/adr/0034-*.md`). Two services, each comfortably under the limit on
+its own, is the fix — not a simplification, the two-Render-service shape
+below is the one to actually use.
 
 ## Before you start
 
@@ -78,7 +90,7 @@ local dev:
    Raise it further if Upstash's dashboard shows you approaching the limit;
    lower it if you're not close and want snappier queuing.
 
-## 3. Render — the API + ARQ worker (one service)
+## 3. Render — the API
 
 1. At [render.com](https://render.com), **New → Web Service**, connect
    your GitHub repo.
@@ -92,11 +104,11 @@ local dev:
 
    | Key | Value |
    |---|---|
+   | `PROCESS_ROLE` | `api` (**required** — without this, `start.sh` runs the ARQ worker too, in the same 512 MB instance, which is what crash-looped in the first place; see `docs/adr/0034-*.md`) |
    | `DATABASE_URL` | the Neon string from step 1 (`postgresql+psycopg://…`) |
    | `REDIS_URL` | the Upstash `rediss://…` string from step 2 |
-   | `ARQ_POLL_DELAY_S` | `5` |
    | `ENVIRONMENT` | `staging` (**not** `production` — see "Known limitations" below for why) |
-   | `CORS_ALLOW_ORIGINS` | `https://<your-project>.vercel.app` (plain, or comma-separated for more than one; a JSON array also works — you'll know this URL after step 5, Render lets you edit env vars and redeploy any time; leaving it unset for now is fine too, it falls back to allowing only localhost, not to a crash) |
+   | `CORS_ALLOW_ORIGINS` | `https://<your-project>.vercel.app` (plain, or comma-separated for more than one; a JSON array also works — you'll know this URL after step 6, Render lets you edit env vars and redeploy any time; leaving it unset for now is fine too, it falls back to allowing only localhost, not to a crash) |
    | `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | optional — only needed for the council-memo feature |
    | `MEMO_LLM_PROVIDER` | `anthropic` or `groq`, matching whichever key you set |
    | `SENTRY_DSN` | optional |
@@ -105,12 +117,39 @@ local dev:
    "Known limitations."
 6. Deploy. First build takes a few minutes (native geospatial
    dependencies). `start.sh` runs `alembic upgrade head` automatically on
-   every start, then launches the API and the ARQ worker together.
+   every start, then launches the API alone.
 7. Note the service's URL, e.g. `https://coolblock-api.onrender.com` —
-   you'll need it in step 5.
+   you'll need it in step 6.
 8. Confirm it's alive: `curl https://<your-render-api>.onrender.com/health`.
 
-## 4. Render — TiTiler (a second free service)
+## 4. Render — the ARQ worker (a second free service, same image)
+
+This is what actually runs a solve — without it, `/plans/{id}/solve`
+enqueues a job that sits at `"pending"`/`"running"` forever, since nothing
+ever consumes the queue.
+
+1. **New → Web Service**, same GitHub repo, same Dockerfile settings as
+   step 3 (Docker, `apps/api/Dockerfile`, context `.`, instance **Free**).
+2. **No health check path** — this service serves no HTTP traffic; leave
+   Render's health check unset (or point it at nothing, if your plan
+   requires a value — this service doesn't listen on `$PORT` at all in
+   worker mode).
+3. Environment variables: the same `DATABASE_URL`/`REDIS_URL` as step 3,
+   plus:
+
+   | Key | Value |
+   |---|---|
+   | `PROCESS_ROLE` | `worker` (**required**) |
+   | `ARQ_POLL_DELAY_S` | `5` (see step 2's own note — this is the setting it's for) |
+
+   `CORS_ALLOW_ORIGINS`, `ANTHROPIC_API_KEY`, etc. aren't read by this
+   process; harmless to leave unset here.
+4. Deploy. Logs should show `Starting worker for 1 functions:
+   run_plan_solve` and `redis_version=...` — no migrations, no uvicorn.
+5. This service intentionally answers no HTTP requests — there's nothing
+   to `curl`. Verify it by running a real solve (step 7) instead.
+
+## 5. Render — TiTiler (a fourth free service)
 
 This one needs no code from this repo — it's the public TiTiler image,
 configured entirely by environment.
@@ -127,7 +166,7 @@ configured entirely by environment.
    | `CPL_VSIL_CURL_ALLOWED_EXTENSIONS` | `.tif,.TIF,.tiff` |
 
    No AWS/S3 variables needed — this deployment reads the heat-surface COG
-   over plain HTTPS from Vercel (step 5), not from S3-compatible storage.
+   over plain HTTPS from Vercel (step 6), not from S3-compatible storage.
 6. Note this service's URL too, e.g. `https://coolblock-titiler.onrender.com`.
 
 **Optional simplification**: skip this whole step if you don't need the
@@ -136,7 +175,7 @@ live heat-surface layer on the `/map` page right away. Every other feature
 homepage) works without it — you'd just leave `NEXT_PUBLIC_TITILER_URL`
 unset and that one layer won't render.
 
-## 5. Vercel — the web app
+## 6. Vercel — the web app
 
 1. At [vercel.com](https://vercel.com), **Add New → Project**, import the
    same GitHub repo.
@@ -149,7 +188,7 @@ unset and that one layer won't render.
    | Key | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | the Render API URL from step 3 |
-   | `TITILER_URL` | the Render TiTiler URL from step 4 (note: **not** `NEXT_PUBLIC_TITILER_URL` — `next.config.ts` reads this name and re-exposes it under the `NEXT_PUBLIC_` one itself) |
+   | `TITILER_URL` | the Render TiTiler URL from step 5 (note: **not** `NEXT_PUBLIC_TITILER_URL` — `next.config.ts` reads this name and re-exposes it under the `NEXT_PUBLIC_` one itself) |
    | `NEXT_PUBLIC_PMTILES_URL` | `https://<your-project>.vercel.app/tiles/basemap.pmtiles` |
    | `NEXT_PUBLIC_MAP_ASSETS_URL` | `https://<your-project>.vercel.app/tiles` |
    | `NEXT_PUBLIC_HEAT_SURFACE_COG_URL` | `https://<your-project>.vercel.app/tiles/heat_surface_lst.tif` |
@@ -162,7 +201,7 @@ unset and that one layer won't render.
    that service — without this, every API call from the deployed
    frontend fails as an opaque CORS error.
 
-## 6. Verify it for real
+## 7. Verify it for real
 
 - Open the Vercel URL. The homepage should load with the real
   neighborhood scene.
