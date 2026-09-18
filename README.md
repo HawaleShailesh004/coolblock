@@ -11,7 +11,7 @@ where a city council needs it to start.
 Built for NextStep Hacks 2026 ("Earth Forward"). Locked pilot neighborhood:
 **Edison–Eastlake, Phoenix, AZ** — see [`config/neighborhood.toml`](config/neighborhood.toml).
 
-**[Live demo →](#)** _(added once deployed — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md))_
+**[Live demo → coolblock.vercel.app](https://coolblock.vercel.app)** — deployed on free tiers (see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)); the first solve after an idle period can take 20–30 s while the servers wake.
 
 ## The problem
 
@@ -62,7 +62,7 @@ real tool), same budget, same real sites, same real objective:
 | Budget | CoolBlock (EWCB) | Best alternative (EWCB) | CoolBlock's lead |
 |---|---|---|---|
 | $20,000 | 4,057 | 1,182 (Tree Equity Score) | **3.4×** |
-| $50,000 | 11,775 | 8,182 (squeaky wheel) | **1.4×** |
+| $50,000 | 11,775 | 8,182 (Tree Equity Score) | **1.4×** |
 | $100,000 | 18,179 | 7,220 (Tree Equity Score) | **2.5×** |
 
 Every plan above is **proven optimal** for its candidate pool, not just "the

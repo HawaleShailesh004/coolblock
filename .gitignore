@@ -88,6 +88,10 @@ data/derived/*
 # and docs/ARCHITECTURE.md for the real, public project docs instead. ---
 outputs/
 docs/DEVPOST-COMPETITOR-RESEARCH.md
+docs/ns2026-enum.json
+# Submission media and its tooling: the demo video project, Devpost copy,
+# thumbnail and diagrams -- large binaries and hackathon collateral, not code.
+media/
 
 # --- Editors / OS ---
 .vscode/*
