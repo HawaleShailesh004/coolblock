@@ -17,10 +17,43 @@ try {
 // dependency, the basemap's glyphs/sprite), so this list is exhaustive
 // for local dev; a production deploy would replace these with its real
 // hostnames, not add new ones.
+//
+// **These must read the same env vars the client code reads.** They did not,
+// and it shipped: the CSP read `TITILER_URL` while `app/map/page.tsx` reads
+// `NEXT_PUBLIC_TITILER_URL`. Setting the documented `NEXT_PUBLIC_` var on a
+// real deploy therefore pointed the map at the deployed TiTiler while leaving
+// the CSP pinned to `http://localhost:8090`, so every heat tile was refused by
+// the browser ("Connecting to ... violates the ... Content Security Policy")
+// and the heat surface -- the product's central visual -- silently never
+// rendered in production. Nothing errored server-side; the layer was just
+// absent. Deriving both from one list is what stops that recurring.
+const originOf = (url: string | undefined): string | null => {
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null; // a relative/same-origin value is already covered by 'self'
+  }
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TITILER_URL = process.env.TITILER_URL ?? "http://localhost:8090";
+const TITILER_URL = process.env.NEXT_PUBLIC_TITILER_URL ?? process.env.TITILER_URL ?? "http://localhost:8090";
 const MINIO_URL = "http://localhost:9000"; // pmtiles/glyphs/sprite -- see NEXT_PUBLIC_PMTILES_URL/NEXT_PUBLIC_MAP_ASSETS_URL
-const LOCAL_ORIGINS = [API_URL, TITILER_URL, MINIO_URL].join(" ");
+const LOCAL_ORIGINS = [
+  ...new Set(
+    [
+      API_URL,
+      TITILER_URL,
+      MINIO_URL,
+      // Same-origin on a Vercel deploy (served from /tiles/...), cross-origin
+      // when pointed at object storage -- include whichever it actually is.
+      process.env.NEXT_PUBLIC_PMTILES_URL,
+      process.env.NEXT_PUBLIC_MAP_ASSETS_URL,
+    ]
+      .map(originOf)
+      .filter((o): o is string => o !== null),
+  ),
+].join(" ");
 
 // **Disclosed tradeoff, not a silently weakened CSP**: `script-src`
 // includes 'unsafe-inline' because Next.js's App Router injects its own
