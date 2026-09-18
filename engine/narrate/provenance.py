@@ -126,16 +126,30 @@ def _find_matching_path(value: float, known: dict[str, float]) -> str | None:
     return None
 
 
+# A model may group thousands with a no-break, figure, thin, or narrow
+# no-break space instead of a comma, and write a Unicode minus sign instead of
+# "-". `_NUMBER_RE` only knows ASCII, so "3 724" was read as a stray "3"
+# plus an unverified "724" -- an amber flag on a figure that was correct.
+# Every substitution is one character for one character, so match offsets
+# stay valid against the original text the UI underlines.
+_GROUP_SEPARATOR_RE = re.compile(r"(?<=\d)[    ](?=\d{3}(?!\d))")
+
+
+def _ascii_numerals(text: str) -> str:
+    return _GROUP_SEPARATOR_RE.sub(",", text).replace("−", "-")
+
+
 def verify_numbers(text: str, payload: dict[str, Any]) -> list[NumberMatch]:
     """Extracts every numeric token from `text` and checks it against
     every numeric leaf in `payload`. Returns one `NumberMatch` per token,
     in order of appearance, whether or not it verified."""
     known = flatten_numeric_leaves(payload)
     matches: list[NumberMatch] = []
-    for m in _NUMBER_RE.finditer(text):
+    for m in _NUMBER_RE.finditer(_ascii_numerals(text)):
         value = _parse_numeric_token(m.group())
         if value is None:
             continue
         path = _find_matching_path(value, known)
-        matches.append(NumberMatch(raw=m.group(), value=value, start=m.start(), end=m.end(), verified=path is not None, path=path))
+        raw = text[m.start() : m.end()]
+        matches.append(NumberMatch(raw=raw, value=value, start=m.start(), end=m.end(), verified=path is not None, path=path))
     return matches

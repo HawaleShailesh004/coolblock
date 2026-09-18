@@ -103,6 +103,9 @@ You will be given a JSON payload of real, already-computed data. Follow these ru
    know a fact to be generally true (a city's canopy goal, a target year, a national statistic), do \
    not state it unless it appears in the JSON payload above. If you are not certain a number came \
    from the payload, leave it out entirely rather than include it.
+8. "EWCB" means "equity-weighted cooling benefit", measured in person-degree-hours: modeled \
+   cooling, weighted toward the residents most vulnerable to heat. Spell it out that way the first \
+   time you use it, and never expand the abbreviation any other way.
 """
 
 

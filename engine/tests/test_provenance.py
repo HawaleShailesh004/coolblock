@@ -82,3 +82,19 @@ def test_verify_numbers_rejects_values_outside_tolerance() -> None:
     # off by more than 1% and more than the absolute floor
     matches = verify_numbers("The total modeled benefit was 130,000.", payload)
     assert matches[0].verified is False
+
+
+def test_verify_numbers_reads_unicode_digit_group_separators_as_one_number() -> None:
+    # Groq's gpt-oss-120b writes non-breaking hyphens (U+2011) in memos, so it
+    # can as plausibly group thousands with a narrow no-break space (U+202F).
+    # Split on that, "3\u202f724.0" verified as a stray "3" plus an unverified
+    # "724.0" -- an amber "could not be verified" underline on a figure that
+    # was correct, which is the exact trust signal this guard exists to give.
+    payload = {"total_ewcb": 3724.0, "delta_c": -13.2}
+    text = "a total of 3\u202f724.0 person-degree-hours, and a contrast of \u221213.2"
+    matches = verify_numbers(text, payload)
+    assert [m.value for m in matches] == [3724.0, -13.2]
+    assert all(m.verified for m in matches)
+    # offsets must still point into the original text for the UI's underlines
+    assert [text[m.start : m.end] for m in matches] == [m.raw for m in matches]
+    assert matches[0].raw == "3\u202f724.0"
